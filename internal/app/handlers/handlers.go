@@ -74,7 +74,7 @@ type RedirectToOriginalURLHandler struct{}
 
 func (redirect RedirectToOriginalURLHandler) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
 	if method := request.Method; method != http.MethodGet {
-		http.Error(writer, "Only POST method is allowed", http.StatusBadRequest)
+		http.Error(writer, "Only GET method is allowed", http.StatusBadRequest)
 		return
 	}
 	id := request.PathValue("id")
