@@ -266,6 +266,6 @@ func TestParseFlags(t *testing.T) {
 	}
 	os.Args = test.flags
 	ParseFlags()
-	assert.Equal(t, Config.Address.String(), test.wantAddress)
-	assert.Equal(t, Config.HostedOn.String(), test.wantBaseAddress)
+	assert.Equal(t, argsConfig.Address.String(), test.wantAddress)
+	assert.Equal(t, argsConfig.HostedOn.String(), test.wantBaseAddress)
 }

@@ -93,7 +93,7 @@ func TestShortURLService_Create(t *testing.T) {
 			}
 			assert.IsType(t, "", got)
 			assert.NotEmpty(t, got)
-			assert.Contains(t, got, config.Config.HostedOn.String())
+			assert.Contains(t, got, config.Settings.HostedOn)
 		})
 	}
 }

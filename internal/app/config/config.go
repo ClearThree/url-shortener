@@ -9,10 +9,32 @@ import (
 	"strings"
 )
 
-var Config struct {
+type Config struct {
+	Address  string `env:"SERVER_ADDRESS"`
+	HostedOn string `env:"BASE_URL"`
+}
+
+func (cfg *Config) Sanitize() {
+	if !strings.HasSuffix(cfg.HostedOn, "/") {
+		cfg.HostedOn = cfg.HostedOn + "/"
+	}
+}
+
+var Settings Config
+
+func NewConfigFromArgs(argsConfig ArgsConfig) Config {
+	return Config{
+		Address:  argsConfig.Address.String(),
+		HostedOn: argsConfig.HostedOn.String(),
+	}
+}
+
+type ArgsConfig struct {
 	Address  NetAddress
 	HostedOn HTTPAddress
 }
+
+var argsConfig ArgsConfig
 
 type NetAddress struct {
 	Host string
@@ -88,18 +110,12 @@ func ParseFlags() {
 		baseAddr.Host = "localhost"
 		baseAddr.Port = 8080
 	}
-	Config.Address = *hostAddr
-	Config.HostedOn = *baseAddr
+	argsConfig.Address = *hostAddr
+	argsConfig.HostedOn = *baseAddr
+	Settings = NewConfigFromArgs(argsConfig)
 }
 
 func init() {
-	Config.Address = NetAddress{
-		Host: "localhost",
-		Port: 8080,
-	}
-	Config.HostedOn = HTTPAddress{
-		Scheme: "http://",
-		Host:   "localhost",
-		Port:   8080,
-	}
+	Settings.Address = "localhost:8080"
+	Settings.HostedOn = "http://localhost:8080/"
 }

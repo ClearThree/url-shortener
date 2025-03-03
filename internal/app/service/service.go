@@ -42,7 +42,7 @@ func (s *ShortURLService) Create(originalURL string) (string, error) {
 			break
 		}
 	}
-	return config.Config.HostedOn.String() + s.repo.Create(id, originalURL), nil
+	return config.Settings.HostedOn + s.repo.Create(id, originalURL), nil
 }
 
 func (s *ShortURLService) Read(id string) (string, error) {
