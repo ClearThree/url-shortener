@@ -4,12 +4,12 @@ import (
 	"errors"
 	"math/rand"
 
+	"github.com/clearthree/url-shortener/internal/app/config"
 	"github.com/clearthree/url-shortener/internal/app/storage"
 )
 
 const letters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
 const shortURLIdLength = 8
-const hostedOn = "http://localhost:8080/"
 
 var ErrShortURLNotFound = errors.New("no urls found by the given id")
 
@@ -42,7 +42,7 @@ func (s *ShortURLService) Create(originalURL string) (string, error) {
 			break
 		}
 	}
-	return hostedOn + s.repo.Create(id, originalURL), nil
+	return config.Config.HostedOn.String() + s.repo.Create(id, originalURL), nil
 }
 
 func (s *ShortURLService) Read(id string) (string, error) {

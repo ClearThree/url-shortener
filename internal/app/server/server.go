@@ -15,12 +15,11 @@ func ShortenURLRouter() chi.Router {
 	router := chi.NewRouter()
 	router.Use(middleware.Logger)
 	router.Use(middleware.Recoverer)
-	//router.Use(middleware.AllowContentType("text/plain"))
 	router.Post("/", createHandler.ServeHTTP)
 	router.Get("/{id}", redirectHandler.ServeHTTP)
 	return router
 }
 
-func Run() error {
-	return http.ListenAndServe(`localhost:8080`, ShortenURLRouter())
+func Run(addr string) error {
+	return http.ListenAndServe(addr, ShortenURLRouter())
 }

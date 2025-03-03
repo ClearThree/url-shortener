@@ -1,6 +1,7 @@
 package service
 
 import (
+	"github.com/clearthree/url-shortener/internal/app/config"
 	"github.com/clearthree/url-shortener/internal/app/storage"
 	"github.com/stretchr/testify/assert"
 
@@ -92,7 +93,7 @@ func TestShortURLService_Create(t *testing.T) {
 			}
 			assert.IsType(t, "", got)
 			assert.NotEmpty(t, got)
-			assert.Contains(t, got, hostedOn)
+			assert.Contains(t, got, config.Config.HostedOn.String())
 		})
 	}
 }

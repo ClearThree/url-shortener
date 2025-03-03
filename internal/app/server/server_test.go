@@ -66,6 +66,14 @@ func TestRouter(t *testing.T) {
 			status:    http.StatusOK,
 			preCreate: true,
 		},
+		{
+			URL:       "/",
+			method:    http.MethodGet,
+			payload:   "",
+			want:      "",
+			status:    http.StatusMethodNotAllowed,
+			preCreate: false,
+		},
 	}
 	for _, test := range tests {
 		var URL = test.URL
