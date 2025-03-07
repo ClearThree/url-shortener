@@ -50,18 +50,6 @@ func TestCreateShortURLHandler(t *testing.T) {
 			},
 		},
 		{
-			name:                 "Unsuccessful request due to wrong method",
-			requestPayload:       "https://ya.ru",
-			requestMethod:        http.MethodGet,
-			requestContentType:   "text/plain",
-			requestContentLength: "",
-			want: want{
-				code:        400,
-				response:    `Only POST method is allowed`,
-				contentType: "text/plain; charset=utf-8",
-			},
-		},
-		{
 			name:                 "Unsuccessful request due to wrong content-length",
 			requestPayload:       "https://ya.ru",
 			requestMethod:        http.MethodPost,
@@ -163,16 +151,6 @@ func TestRedirectToOriginalURLHandler(t *testing.T) {
 			want: want{
 				code:     404,
 				response: "Short url not found",
-				header:   "",
-			},
-		},
-		{
-			name:          "Unsuccessful redirection due to wrong method",
-			preloadURL:    "",
-			requestMethod: http.MethodPost,
-			want: want{
-				code:     400,
-				response: "Only GET method is allowed",
 				header:   "",
 			},
 		},

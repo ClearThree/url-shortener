@@ -24,10 +24,6 @@ func isURL(payload string) bool {
 type CreateShortURLHandler struct{}
 
 func (create CreateShortURLHandler) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
-	if method := request.Method; method != http.MethodPost {
-		http.Error(writer, "Only POST method is allowed", http.StatusBadRequest)
-		return
-	}
 	if contentType := request.Header.Get("Content-Type"); !strings.Contains(contentType, "text/plain") {
 		http.Error(writer, "Only text/plain content type is allowed", http.StatusBadRequest)
 		return
@@ -73,10 +69,6 @@ func (create CreateShortURLHandler) ServeHTTP(writer http.ResponseWriter, reques
 type RedirectToOriginalURLHandler struct{}
 
 func (redirect RedirectToOriginalURLHandler) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
-	if method := request.Method; method != http.MethodGet {
-		http.Error(writer, "Only GET method is allowed", http.StatusBadRequest)
-		return
-	}
 	id := request.PathValue("id")
 	if id == "" {
 		http.Error(writer, "Please provide the short url ID", http.StatusBadRequest)
