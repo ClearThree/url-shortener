@@ -12,6 +12,7 @@ import (
 type Config struct {
 	Address  string `env:"SERVER_ADDRESS"`
 	HostedOn string `env:"BASE_URL"`
+	LogLevel string `env:"LOG_LEVEL" envDefault:"INFO"`
 }
 
 func (cfg *Config) Sanitize() {
@@ -118,4 +119,5 @@ func ParseFlags() {
 func init() {
 	Settings.Address = "localhost:8080"
 	Settings.HostedOn = "http://localhost:8080/"
+	Settings.LogLevel = "INFO"
 }
