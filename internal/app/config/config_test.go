@@ -2,6 +2,7 @@ package config
 
 import (
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"os"
 	"testing"
 )
@@ -268,4 +269,59 @@ func TestParseFlags(t *testing.T) {
 	ParseFlags()
 	assert.Equal(t, argsConfig.Address.String(), test.wantAddress)
 	assert.Equal(t, argsConfig.HostedOn.String(), test.wantBaseAddress)
+}
+
+func TestFileStoragePath_Set(t *testing.T) {
+	type fields struct {
+		Path string
+	}
+	type args struct {
+		s string
+	}
+	tests := []struct {
+		name string
+		args args
+	}{
+		{
+			name: "set file storage path success",
+			args: args{
+				s: "./",
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			f := &FileStoragePath{}
+			err := f.Set(tt.args.s)
+			require.NoError(t, err)
+			assert.Equal(t, tt.args.s, f.Path)
+		})
+	}
+}
+
+func TestFileStoragePath_String(t *testing.T) {
+	type fields struct {
+		Path string
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		want   string
+	}{
+		{
+			name: "get file storage path success",
+			fields: fields{
+				Path: "./",
+			},
+			want: "./",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			f := &FileStoragePath{
+				Path: tt.fields.Path,
+			}
+			assert.Equalf(t, tt.want, f.String(), "String()")
+		})
+	}
 }

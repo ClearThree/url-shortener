@@ -11,11 +11,11 @@ import (
 func main() {
 	config.ParseFlags()
 	err := env.Parse(&config.Settings)
-	config.Settings.Sanitize()
 	if err != nil {
 		fmt.Println("parsing env variables was not successful: ", err)
 	}
-	if err := server.Run(config.Settings.Address); err != nil {
+	config.Settings.Sanitize()
+	if err = server.Run(config.Settings.Address); err != nil {
 		log.Fatalf("Server failed to start: %v", err)
 	}
 }

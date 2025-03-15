@@ -2,10 +2,9 @@ package service
 
 import (
 	"errors"
-	"math/rand"
-
 	"github.com/clearthree/url-shortener/internal/app/config"
 	"github.com/clearthree/url-shortener/internal/app/storage"
+	"math/rand"
 )
 
 const letters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
@@ -42,7 +41,9 @@ func (s *ShortURLService) Create(originalURL string) (string, error) {
 			break
 		}
 	}
-	return config.Settings.HostedOn + s.repo.Create(id, originalURL), nil
+	result := config.Settings.HostedOn + s.repo.Create(id, originalURL)
+	_, err := storage.FSWrapper.Create(id, originalURL)
+	return result, err
 }
 
 func (s *ShortURLService) Read(id string) (string, error) {
@@ -51,6 +52,11 @@ func (s *ShortURLService) Read(id string) (string, error) {
 		return originalURL, ErrShortURLNotFound
 	}
 	return originalURL, nil
+}
+
+func (s *ShortURLService) FillRow(originalURL string, shortURL string) error {
+	s.repo.Create(shortURL, originalURL)
+	return nil
 }
 
 var ShortURLServiceInstance = NewService(storage.MemoryRepo{})

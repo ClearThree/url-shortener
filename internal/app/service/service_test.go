@@ -141,6 +141,50 @@ func TestShortURLService_Read(t *testing.T) {
 	}
 }
 
+func TestShortURLService_FillRow(t *testing.T) {
+	type fields struct {
+		repo storage.Repository
+	}
+	type args struct {
+		shortURL    string
+		originalURL string
+	}
+	tests := []struct {
+		name    string
+		fields  fields
+		args    args
+		wantErr bool
+	}{
+		{
+			name:    "Successful filling of short URL",
+			fields:  fields{repo: RepoMock{make(map[string]string)}},
+			args:    args{originalURL: "https://ya.ru"},
+			wantErr: false,
+		},
+		{
+			name:   "Successful filling of short url with long original URL",
+			fields: fields{repo: RepoMock{make(map[string]string)}},
+			args: args{
+				originalURL: "https://example.com/veeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeerylong",
+			},
+			wantErr: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := &ShortURLService{
+				repo: tt.fields.repo,
+			}
+			err := s.FillRow(tt.args.originalURL, tt.args.shortURL)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("Create() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			assert.Equal(t, tt.fields.repo.Read(tt.args.shortURL), tt.args.originalURL)
+		})
+	}
+}
+
 func Test_generateID(t *testing.T) {
 	tests := []struct {
 		name       string
