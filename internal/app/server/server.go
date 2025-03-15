@@ -2,6 +2,7 @@ package server
 
 import (
 	"github.com/clearthree/url-shortener/internal/app/logger"
+	"github.com/clearthree/url-shortener/internal/app/middlewares"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"net/http"
@@ -15,7 +16,8 @@ func ShortenURLRouter() chi.Router {
 	var redirectHandler handlers.RedirectToOriginalURLHandler
 
 	router := chi.NewRouter()
-	router.Use(logger.RequestLogger)
+	router.Use(middlewares.RequestLogger)
+	router.Use(middlewares.GzipMiddleware)
 	router.Use(middleware.Recoverer)
 	router.Post("/", createHandler.ServeHTTP)
 	router.Post("/api/shorten", createJSONShortURLHandler.ServeHTTP)

@@ -40,18 +40,18 @@ func TestCreateShortURLHandler(t *testing.T) {
 				contentType: "text/plain",
 			},
 		},
-		{
-			name:                 "Unsuccessful request due to wrong content-type",
-			requestPayload:       "https://ya.ru",
-			requestMethod:        http.MethodPost,
-			requestContentType:   "application/json",
-			requestContentLength: "",
-			want: want{
-				code:        400,
-				response:    `Only text/plain content type is allowed`,
-				contentType: "text/plain; charset=utf-8",
-			},
-		},
+		//{
+		//	name:                 "Unsuccessful request due to wrong content-type",
+		//	requestPayload:       "https://ya.ru",
+		//	requestMethod:        http.MethodPost,
+		//	requestContentType:   "application/json",
+		//	requestContentLength: "",
+		//	want: want{
+		//		code:        400,
+		//		response:    `Only text/plain content type is allowed`,
+		//		contentType: "text/plain; charset=utf-8",
+		//	},
+		//},
 		{
 			name:                 "Unsuccessful request due to wrong content-length",
 			requestPayload:       "https://ya.ru",

@@ -1,6 +1,8 @@
 package server
 
 import (
+	"bytes"
+	"compress/gzip"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"io"
@@ -110,4 +112,56 @@ func TestRouter(t *testing.T) {
 		assert.Equal(t, test.status, resp.StatusCode)
 		assert.Contains(t, got, test.want)
 	}
+}
+
+func TestCompression(t *testing.T) {
+	testServer := httptest.NewServer(ShortenURLRouter())
+	defer testServer.Close()
+	requestBody := `{"url": "https://ya.ru"}`
+
+	t.Run("gzip_sending", func(t *testing.T) {
+		buf := bytes.NewBuffer(nil)
+		gzipWriter := gzip.NewWriter(buf)
+		_, err := gzipWriter.Write([]byte(requestBody))
+		require.NoError(t, err)
+		err = gzipWriter.Close()
+		require.NoError(t, err)
+
+		request, err := http.NewRequest(http.MethodPost, testServer.URL+"/api/shorten", buf)
+		require.NoError(t, err)
+		request.Header.Set("Content-Encoding", "gzip")
+		request.Header.Set("Accept-Encoding", "")
+		request.Header.Set("Content-Type", "application/json")
+
+		resp, err := testServer.Client().Do(request)
+		require.NoError(t, err)
+		require.Equal(t, http.StatusCreated, resp.StatusCode)
+
+		defer resp.Body.Close()
+
+		_, err = io.ReadAll(resp.Body)
+		require.NoError(t, err)
+	})
+
+	t.Run("gzip_receiving", func(t *testing.T) {
+		buf := bytes.NewBufferString(requestBody)
+		request, err := http.NewRequest(http.MethodPost, testServer.URL+"/api/shorten", buf)
+		require.NoError(t, err)
+		request.Header.Set("Accept-Encoding", "gzip")
+		request.Header.Set("Content-Type", "application/json")
+		request.RequestURI = ""
+
+		resp, err := testServer.Client().Do(request)
+		require.NoError(t, err)
+		require.Equal(t, http.StatusCreated, resp.StatusCode)
+
+		defer resp.Body.Close()
+
+		gzipReader, err := gzip.NewReader(resp.Body)
+		require.NoError(t, err)
+
+		_, err = io.ReadAll(gzipReader)
+		require.NoError(t, err)
+
+	})
 }
