@@ -1,6 +1,9 @@
 package handlers
 
 import (
+	"encoding/json"
+	"github.com/clearthree/url-shortener/internal/app/config"
+	"github.com/clearthree/url-shortener/internal/app/models"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"io"
@@ -189,6 +192,75 @@ func TestRedirectToOriginalURLHandler(t *testing.T) {
 				assert.NotEmpty(t, header)
 				assert.Equal(t, test.want.response, header)
 			}
+		})
+	}
+}
+
+func TestCreateJSONShortURLHandler_ServeHTTP(t *testing.T) {
+	type want struct {
+		code        int
+		contentType string
+		errMessage  string
+	}
+	tests := []struct {
+		name               string
+		requestPayload     string
+		requestContentType string
+		want               want
+	}{
+		{
+			name:               "Successful creation of the short URL",
+			requestPayload:     `{"url": "https://ya.ru"}`,
+			requestContentType: "application/json",
+			want: want{
+				code:        201,
+				contentType: "application/json",
+				errMessage:  "",
+			},
+		},
+		{
+			name:               "Empty URL passed",
+			requestPayload:     `{"url": ""}`,
+			requestContentType: "application/json",
+			want: want{
+				code:        400,
+				contentType: "application/json",
+				errMessage:  "Please provide an url\n",
+			},
+		},
+		{
+			name:               "Invalid URL passed",
+			requestPayload:     `{"url": "asdasdsa"}`,
+			requestContentType: "application/json",
+			want: want{
+				code:        400,
+				contentType: "application/json",
+				errMessage:  "The provided payload is not a valid URL\n",
+			},
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			body := strings.NewReader(test.requestPayload)
+			request := httptest.NewRequest(http.MethodPost, "/", body)
+			request.Header.Add("Content-Type", test.requestContentType)
+			recorder := httptest.NewRecorder()
+			CreateJSONShortURLHandler{}.ServeHTTP(recorder, request)
+			res := recorder.Result()
+			assert.Equal(t, test.want.code, res.StatusCode)
+			defer res.Body.Close()
+			if test.want.errMessage != "" {
+				resBody, err := io.ReadAll(res.Body)
+				require.NoError(t, err)
+				assert.Equal(t, test.want.errMessage, string(resBody))
+				return
+			}
+			var responseData models.ShortenResponse
+			dec := json.NewDecoder(res.Body)
+			err := dec.Decode(&responseData)
+			require.NoError(t, err)
+			assert.Contains(t, responseData.Result, config.Settings.HostedOn)
+			assert.Equal(t, test.want.contentType, res.Header.Get("Content-Type"))
 		})
 	}
 }

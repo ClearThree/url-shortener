@@ -11,12 +11,14 @@ import (
 
 func ShortenURLRouter() chi.Router {
 	var createHandler handlers.CreateShortURLHandler
+	var createJSONShortURLHandler handlers.CreateJSONShortURLHandler
 	var redirectHandler handlers.RedirectToOriginalURLHandler
 
 	router := chi.NewRouter()
 	router.Use(logger.RequestLogger)
 	router.Use(middleware.Recoverer)
 	router.Post("/", createHandler.ServeHTTP)
+	router.Post("/api/shorten", createJSONShortURLHandler.ServeHTTP)
 	router.Get("/{id}", redirectHandler.ServeHTTP)
 	return router
 }
