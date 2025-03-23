@@ -5,16 +5,17 @@ import (
 	"github.com/caarlos0/env/v6"
 	"github.com/clearthree/url-shortener/internal/app/config"
 	"github.com/clearthree/url-shortener/internal/app/server"
+	"log"
 )
 
 func main() {
 	config.ParseFlags()
 	err := env.Parse(&config.Settings)
-	config.Settings.Sanitize()
 	if err != nil {
 		fmt.Println("parsing env variables was not successful: ", err)
 	}
-	if err := server.Run(config.Settings.Address); err != nil {
-		panic(err)
+	config.Settings.Sanitize()
+	if err = server.Run(config.Settings.Address); err != nil {
+		log.Fatalf("Server failed to start: %v", err)
 	}
 }

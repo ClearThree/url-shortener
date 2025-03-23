@@ -10,8 +10,10 @@ import (
 )
 
 type Config struct {
-	Address  string `env:"SERVER_ADDRESS"`
-	HostedOn string `env:"BASE_URL"`
+	Address         string `env:"SERVER_ADDRESS"`
+	HostedOn        string `env:"BASE_URL"`
+	LogLevel        string `env:"LOG_LEVEL" envDefault:"INFO"`
+	FileStoragePath string `env:"FILE_STORAGE_PATH"`
 }
 
 func (cfg *Config) Sanitize() {
@@ -24,14 +26,16 @@ var Settings Config
 
 func NewConfigFromArgs(argsConfig ArgsConfig) Config {
 	return Config{
-		Address:  argsConfig.Address.String(),
-		HostedOn: argsConfig.HostedOn.String(),
+		Address:         argsConfig.Address.String(),
+		HostedOn:        argsConfig.HostedOn.String(),
+		FileStoragePath: argsConfig.FileStoragePath.String(),
 	}
 }
 
 type ArgsConfig struct {
-	Address  NetAddress
-	HostedOn HTTPAddress
+	Address         NetAddress
+	HostedOn        HTTPAddress
+	FileStoragePath FileStoragePath
 }
 
 var argsConfig ArgsConfig
@@ -95,11 +99,29 @@ func (h *HTTPAddress) Set(flagValue string) error {
 	return err
 }
 
+type FileStoragePath struct {
+	Path string
+}
+
+func (f *FileStoragePath) String() string {
+	return f.Path
+}
+
+func (f *FileStoragePath) Set(s string) error {
+	if s == "" {
+		return errors.New("file storage path must not be empty")
+	}
+	f.Path = s
+	return nil
+}
+
 func ParseFlags() {
 	hostAddr := new(NetAddress)
 	baseAddr := new(HTTPAddress)
+	fileStoragePath := new(FileStoragePath)
 	flag.Var(hostAddr, "a", "Address to host on host:port")
-	flag.Var(baseAddr, "b", "base url for resulting short url (scheme://host:port)")
+	flag.Var(baseAddr, "b", "base URL for resulting short URL (scheme://host:port)")
+	flag.Var(fileStoragePath, "f", "path to file to store short URLs")
 	flag.Parse()
 	if hostAddr.Host == "" && hostAddr.Port == 0 {
 		hostAddr.Host = "localhost"
@@ -110,12 +132,18 @@ func ParseFlags() {
 		baseAddr.Host = "localhost"
 		baseAddr.Port = 8080
 	}
+	if fileStoragePath.Path == "" {
+		fileStoragePath.Path = "./internal/app/storage/storage.json"
+	}
 	argsConfig.Address = *hostAddr
 	argsConfig.HostedOn = *baseAddr
+	argsConfig.FileStoragePath = *fileStoragePath
 	Settings = NewConfigFromArgs(argsConfig)
 }
 
 func init() {
 	Settings.Address = "localhost:8080"
 	Settings.HostedOn = "http://localhost:8080/"
+	Settings.LogLevel = "INFO"
+	Settings.FileStoragePath = "./storage.json"
 }
