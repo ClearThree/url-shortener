@@ -27,10 +27,11 @@ func isURL(payload string) bool {
 type CreateShortURLHandler struct{}
 
 func (create CreateShortURLHandler) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
-	//if contentType := request.Header.Get("Content-Type"); !strings.Contains(contentType, "text/plain") {
-	//	http.Error(writer, "Only text/plain content type is allowed", http.StatusBadRequest)
-	//	return
-	//}  // Внезапно, ломает тесты 8 инкремента
+	if contentType := request.Header.Get("Content-Type"); !(strings.Contains(contentType, "text/plain") ||
+		strings.Contains(contentType, "application/x-gzip")) {
+		http.Error(writer, "Only text/plain or application/x-gzip content types are allowed", http.StatusBadRequest)
+		return
+	}
 	contentLength, err := strconv.Atoi(request.Header.Get("Content-Length"))
 	if err != nil {
 		http.Error(writer, "Content-Length header is invalid, should be integer", http.StatusBadRequest)
