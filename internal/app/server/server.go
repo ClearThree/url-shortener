@@ -1,22 +1,31 @@
 package server
 
 import (
+	"context"
+	"database/sql"
 	"errors"
+	"github.com/clearthree/url-shortener/internal/app/config"
+	"github.com/clearthree/url-shortener/internal/app/handlers"
 	"github.com/clearthree/url-shortener/internal/app/logger"
 	"github.com/clearthree/url-shortener/internal/app/middlewares"
 	"github.com/clearthree/url-shortener/internal/app/service"
 	"github.com/clearthree/url-shortener/internal/app/storage"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+	_ "github.com/jackc/pgx/v5/stdlib"
 	"net/http"
-
-	"github.com/clearthree/url-shortener/internal/app/handlers"
+	"time"
 )
 
-func ShortenURLRouter() chi.Router {
-	var createHandler handlers.CreateShortURLHandler
-	var createJSONShortURLHandler handlers.CreateJSONShortURLHandler
-	var redirectHandler handlers.RedirectToOriginalURLHandler
+var Pool *sql.DB
+var shortURLService = service.NewService(storage.MemoryRepo{})
+
+func ShortenURLRouter(pool *sql.DB) chi.Router {
+	var createHandler = handlers.NewCreateShortURLHandler(&shortURLService)
+	var createJSONShortURLHandler = handlers.NewCreateJSONShortURLHandler(&shortURLService)
+	var redirectHandler = handlers.NewRedirectToOriginalURLHandler(&shortURLService)
+	var shortURLServiceDB = service.NewService(storage.NewDBRepo(pool))
+	var pingHandler = handlers.NewPingHandler(&shortURLServiceDB)
 
 	router := chi.NewRouter()
 	router.Use(middlewares.RequestLogger)
@@ -25,6 +34,7 @@ func ShortenURLRouter() chi.Router {
 	router.Post("/", createHandler.ServeHTTP)
 	router.Post("/api/shorten", createJSONShortURLHandler.ServeHTTP)
 	router.Get("/{id}", redirectHandler.ServeHTTP)
+	router.Get("/ping", pingHandler.ServeHTTP)
 	return router
 }
 
@@ -40,7 +50,20 @@ func Run(addr string) error {
 		return err
 	}
 	defer storage.FSWrapper.Close()
-	return http.ListenAndServe(addr, ShortenURLRouter())
+	if config.Settings.DatabaseDSN != "" {
+		Pool, err = sql.Open("pgx", config.Settings.DatabaseDSN)
+		if err != nil {
+			return err
+		}
+		defer Pool.Close()
+		ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
+		defer cancel()
+		if err = Pool.PingContext(ctx); err != nil {
+			panic(err)
+		}
+	}
+	logger.Log.Info("Server initiation completed, starting to serve")
+	return http.ListenAndServe(addr, ShortenURLRouter(Pool))
 }
 
 func prefillMemory() error {
@@ -54,7 +77,7 @@ func prefillMemory() error {
 				return err
 			}
 		}
-		fillingError := service.ShortURLServiceInstance.FillRow(row.OriginalURL, row.ShortURL)
+		fillingError := shortURLService.FillRow(row.OriginalURL, row.ShortURL)
 		if fillingError != nil {
 			return fillingError
 		}

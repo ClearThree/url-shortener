@@ -33,7 +33,7 @@ func testRequest(t *testing.T, testServer *httptest.Server, method string, path 
 }
 
 func TestRouter(t *testing.T) {
-	testServer := httptest.NewServer(ShortenURLRouter())
+	testServer := httptest.NewServer(ShortenURLRouter(nil))
 	defer testServer.Close()
 
 	var tests = []struct {
@@ -115,7 +115,7 @@ func TestRouter(t *testing.T) {
 }
 
 func TestCompression(t *testing.T) {
-	testServer := httptest.NewServer(ShortenURLRouter())
+	testServer := httptest.NewServer(ShortenURLRouter(nil))
 	defer testServer.Close()
 	requestBody := `{"url": "https://ya.ru"}`
 

@@ -24,7 +24,13 @@ func isURL(payload string) bool {
 	return parsedURL.Scheme == "https" || parsedURL.Scheme == "http"
 }
 
-type CreateShortURLHandler struct{}
+type CreateShortURLHandler struct {
+	service service.ShortURLServiceInterface
+}
+
+func NewCreateShortURLHandler(service service.ShortURLServiceInterface) *CreateShortURLHandler {
+	return &CreateShortURLHandler{service: service}
+}
 
 func (create CreateShortURLHandler) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
 	if contentType := request.Header.Get("Content-Type"); !(strings.Contains(contentType, "text/plain") ||
@@ -56,7 +62,7 @@ func (create CreateShortURLHandler) ServeHTTP(writer http.ResponseWriter, reques
 		http.Error(writer, "The provided payload is not a valid URL", http.StatusBadRequest)
 		return
 	}
-	id, err := service.ShortURLServiceInstance.Create(payloadString)
+	id, err := create.service.Create(payloadString)
 	if err != nil {
 		http.Error(writer, "Couldn't create short url", http.StatusBadRequest)
 		return
@@ -70,7 +76,13 @@ func (create CreateShortURLHandler) ServeHTTP(writer http.ResponseWriter, reques
 	}
 }
 
-type RedirectToOriginalURLHandler struct{}
+type RedirectToOriginalURLHandler struct {
+	service service.ShortURLServiceInterface
+}
+
+func NewRedirectToOriginalURLHandler(service service.ShortURLServiceInterface) *RedirectToOriginalURLHandler {
+	return &RedirectToOriginalURLHandler{service: service}
+}
 
 func (redirect RedirectToOriginalURLHandler) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
 	id := request.PathValue("id")
@@ -78,7 +90,7 @@ func (redirect RedirectToOriginalURLHandler) ServeHTTP(writer http.ResponseWrite
 		http.Error(writer, "Please provide the short url ID", http.StatusBadRequest)
 		return
 	}
-	originalURL, err := service.ShortURLServiceInstance.Read(id)
+	originalURL, err := redirect.service.Read(id)
 	if err != nil {
 		if errors.Is(err, service.ErrShortURLNotFound) {
 			http.Error(writer, "Short url not found", http.StatusNotFound)
@@ -91,7 +103,13 @@ func (redirect RedirectToOriginalURLHandler) ServeHTTP(writer http.ResponseWrite
 	http.Redirect(writer, request, originalURL, http.StatusTemporaryRedirect)
 }
 
-type CreateJSONShortURLHandler struct{}
+type CreateJSONShortURLHandler struct {
+	service service.ShortURLServiceInterface
+}
+
+func NewCreateJSONShortURLHandler(service service.ShortURLServiceInterface) *CreateJSONShortURLHandler {
+	return &CreateJSONShortURLHandler{service: service}
+}
 
 func (create CreateJSONShortURLHandler) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
 	if contentType := request.Header.Get("Content-Type"); !strings.Contains(contentType, "application/json") {
@@ -115,7 +133,7 @@ func (create CreateJSONShortURLHandler) ServeHTTP(writer http.ResponseWriter, re
 		http.Error(writer, "The provided payload is not a valid URL", http.StatusBadRequest)
 		return
 	}
-	id, err := service.ShortURLServiceInstance.Create(requestData.URL)
+	id, err := create.service.Create(requestData.URL)
 	if err != nil {
 		http.Error(writer, "Couldn't create short url", http.StatusBadRequest)
 		return
@@ -127,5 +145,20 @@ func (create CreateJSONShortURLHandler) ServeHTTP(writer http.ResponseWriter, re
 	if err := enc.Encode(responseData); err != nil {
 		logger.Log.Debugf("Error encoding response: %s", err)
 		return
+	}
+}
+
+type PingHandler struct {
+	service service.ShortURLServiceInterface
+}
+
+func NewPingHandler(service service.ShortURLServiceInterface) *PingHandler {
+	return &PingHandler{service: service}
+}
+
+func (ping PingHandler) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
+	err := ping.service.Ping()
+	if err != nil {
+		http.Error(writer, "Database is not available", http.StatusInternalServerError)
 	}
 }

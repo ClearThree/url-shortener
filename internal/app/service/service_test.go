@@ -31,6 +31,10 @@ func (rm RepoMock) Read(id string) string {
 	return originalURL
 }
 
+func (rm RepoMock) Ping() error {
+	return nil
+}
+
 func TestNewService(t *testing.T) {
 	type args struct {
 		repo storage.Repository

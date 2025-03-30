@@ -3,6 +3,7 @@ package storage
 type Repository interface {
 	Create(id string, originalURL string) string
 	Read(id string) string
+	Ping() error
 }
 
 var memoryStorage map[string]string
@@ -20,6 +21,10 @@ func (m MemoryRepo) Read(id string) string {
 		return ""
 	}
 	return originalURL
+}
+
+func (m MemoryRepo) Ping() error {
+	return nil
 }
 
 func init() {

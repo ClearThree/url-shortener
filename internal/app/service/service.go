@@ -20,9 +20,10 @@ func generateID() string {
 	return string(bytesSlice)
 }
 
-type Interface interface {
-	Create(repo storage.Repository, originalURL string) (string, error)
-	Read(repo storage.Repository, id string) (string, error)
+type ShortURLServiceInterface interface {
+	Create(originalURL string) (string, error)
+	Read(id string) (string, error)
+	Ping() error
 }
 type ShortURLService struct {
 	repo storage.Repository
@@ -59,4 +60,6 @@ func (s *ShortURLService) FillRow(originalURL string, shortURL string) error {
 	return nil
 }
 
-var ShortURLServiceInstance = NewService(storage.MemoryRepo{})
+func (s *ShortURLService) Ping() error {
+	return s.repo.Ping()
+}
