@@ -62,7 +62,7 @@ func (create CreateShortURLHandler) ServeHTTP(writer http.ResponseWriter, reques
 		http.Error(writer, "The provided payload is not a valid URL", http.StatusBadRequest)
 		return
 	}
-	id, err := create.service.Create(payloadString)
+	id, err := create.service.Create(request.Context(), payloadString)
 	if err != nil {
 		http.Error(writer, "Couldn't create short url", http.StatusBadRequest)
 		return
@@ -90,7 +90,7 @@ func (redirect RedirectToOriginalURLHandler) ServeHTTP(writer http.ResponseWrite
 		http.Error(writer, "Please provide the short url ID", http.StatusBadRequest)
 		return
 	}
-	originalURL, err := redirect.service.Read(id)
+	originalURL, err := redirect.service.Read(request.Context(), id)
 	if err != nil {
 		if errors.Is(err, service.ErrShortURLNotFound) {
 			http.Error(writer, "Short url not found", http.StatusNotFound)
@@ -133,7 +133,7 @@ func (create CreateJSONShortURLHandler) ServeHTTP(writer http.ResponseWriter, re
 		http.Error(writer, "The provided payload is not a valid URL", http.StatusBadRequest)
 		return
 	}
-	id, err := create.service.Create(requestData.URL)
+	id, err := create.service.Create(request.Context(), requestData.URL)
 	if err != nil {
 		http.Error(writer, "Couldn't create short url", http.StatusBadRequest)
 		return
@@ -157,7 +157,7 @@ func NewPingHandler(service service.ShortURLServiceInterface) *PingHandler {
 }
 
 func (ping PingHandler) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
-	err := ping.service.Ping()
+	err := ping.service.Ping(request.Context())
 	if err != nil {
 		http.Error(writer, "Database is not available", http.StatusInternalServerError)
 	}

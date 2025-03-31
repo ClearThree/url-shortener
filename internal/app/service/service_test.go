@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"github.com/clearthree/url-shortener/internal/app/config"
 	"github.com/clearthree/url-shortener/internal/app/storage"
 	"github.com/stretchr/testify/assert"
@@ -12,15 +13,15 @@ type RepoMock struct {
 	localStorage map[string]string
 }
 
-func (rm RepoMock) Create(id string, originalURL string) string {
+func (rm RepoMock) Create(ctx context.Context, id string, originalURL string) (string, error) {
 	if rm.localStorage == nil {
 		rm.localStorage = make(map[string]string)
 	}
 	rm.localStorage[id] = originalURL
-	return id
+	return id, nil
 }
 
-func (rm RepoMock) Read(id string) string {
+func (rm RepoMock) Read(ctx context.Context, id string) string {
 	if rm.localStorage == nil {
 		rm.localStorage = make(map[string]string)
 	}
@@ -31,7 +32,7 @@ func (rm RepoMock) Read(id string) string {
 	return originalURL
 }
 
-func (rm RepoMock) Ping() error {
+func (rm RepoMock) Ping(ctx context.Context) error {
 	return nil
 }
 
@@ -62,6 +63,7 @@ func TestShortURLService_Create(t *testing.T) {
 		repo storage.Repository
 	}
 	type args struct {
+		ctx         context.Context
 		originalURL string
 	}
 	tests := []struct {
@@ -80,6 +82,7 @@ func TestShortURLService_Create(t *testing.T) {
 			name:   "Successful creation of short url with long original URL",
 			fields: fields{repo: RepoMock{make(map[string]string)}},
 			args: args{
+				ctx:         context.Background(),
 				originalURL: "https://example.com/veeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeerylong",
 			},
 			wantErr: false,
@@ -90,7 +93,7 @@ func TestShortURLService_Create(t *testing.T) {
 			s := &ShortURLService{
 				repo: tt.fields.repo,
 			}
-			got, err := s.Create(tt.args.originalURL)
+			got, err := s.Create(tt.args.ctx, tt.args.originalURL)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Create() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -107,7 +110,8 @@ func TestShortURLService_Read(t *testing.T) {
 		repo storage.Repository
 	}
 	type args struct {
-		id string
+		ctx context.Context
+		id  string
 	}
 	tests := []struct {
 		name    string
@@ -136,7 +140,7 @@ func TestShortURLService_Read(t *testing.T) {
 			s := &ShortURLService{
 				repo: tt.fields.repo,
 			}
-			got, err := s.Read(tt.args.id)
+			got, err := s.Read(tt.args.ctx, tt.args.id)
 			if tt.wantErr != nil {
 				assert.ErrorIs(t, err, tt.wantErr)
 			}
@@ -150,6 +154,7 @@ func TestShortURLService_FillRow(t *testing.T) {
 		repo storage.Repository
 	}
 	type args struct {
+		ctx         context.Context
 		shortURL    string
 		originalURL string
 	}
@@ -162,13 +167,14 @@ func TestShortURLService_FillRow(t *testing.T) {
 		{
 			name:    "Successful filling of short URL",
 			fields:  fields{repo: RepoMock{make(map[string]string)}},
-			args:    args{originalURL: "https://ya.ru"},
+			args:    args{ctx: context.Background(), originalURL: "https://ya.ru"},
 			wantErr: false,
 		},
 		{
 			name:   "Successful filling of short url with long original URL",
 			fields: fields{repo: RepoMock{make(map[string]string)}},
 			args: args{
+				ctx:         context.Background(),
 				originalURL: "https://example.com/veeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeerylong",
 			},
 			wantErr: false,
@@ -179,12 +185,12 @@ func TestShortURLService_FillRow(t *testing.T) {
 			s := &ShortURLService{
 				repo: tt.fields.repo,
 			}
-			err := s.FillRow(tt.args.originalURL, tt.args.shortURL)
+			err := s.FillRow(tt.args.ctx, tt.args.originalURL, tt.args.shortURL)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Create() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			assert.Equal(t, tt.fields.repo.Read(tt.args.shortURL), tt.args.originalURL)
+			assert.Equal(t, tt.fields.repo.Read(tt.args.ctx, tt.args.shortURL), tt.args.originalURL)
 		})
 	}
 }

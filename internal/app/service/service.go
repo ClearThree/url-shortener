@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"errors"
 	"github.com/clearthree/url-shortener/internal/app/config"
 	"github.com/clearthree/url-shortener/internal/app/storage"
@@ -21,9 +22,9 @@ func generateID() string {
 }
 
 type ShortURLServiceInterface interface {
-	Create(originalURL string) (string, error)
-	Read(id string) (string, error)
-	Ping() error
+	Create(ctx context.Context, originalURL string) (string, error)
+	Read(ctx context.Context, id string) (string, error)
+	Ping(ctx context.Context) error
 }
 type ShortURLService struct {
 	repo storage.Repository
@@ -33,33 +34,40 @@ func NewService(repo storage.Repository) ShortURLService {
 	return ShortURLService{repo: repo}
 }
 
-func (s *ShortURLService) Create(originalURL string) (string, error) {
+func (s *ShortURLService) Create(ctx context.Context, originalURL string) (string, error) {
 	var id string
 	for {
 		id = generateID()
-		existingURLByID := s.repo.Read(id)
+		existingURLByID := s.repo.Read(ctx, id)
 		if existingURLByID == "" {
 			break
 		}
 	}
-	result := config.Settings.HostedOn + s.repo.Create(id, originalURL)
-	_, err := storage.FSWrapper.Create(id, originalURL)
+	shortURL, err := s.repo.Create(ctx, id, originalURL)
+	if err != nil {
+		return "", err
+	}
+	result := config.Settings.HostedOn + shortURL
+	_, err = storage.FSWrapper.Create(id, originalURL)
+	if err != nil {
+		return "", err
+	}
 	return result, err
 }
 
-func (s *ShortURLService) Read(id string) (string, error) {
-	originalURL := s.repo.Read(id)
+func (s *ShortURLService) Read(ctx context.Context, id string) (string, error) {
+	originalURL := s.repo.Read(ctx, id)
 	if originalURL == "" {
 		return originalURL, ErrShortURLNotFound
 	}
 	return originalURL, nil
 }
 
-func (s *ShortURLService) FillRow(originalURL string, shortURL string) error {
-	s.repo.Create(shortURL, originalURL)
-	return nil
+func (s *ShortURLService) FillRow(ctx context.Context, originalURL string, shortURL string) error {
+	_, err := s.repo.Create(ctx, shortURL, originalURL)
+	return err
 }
 
-func (s *ShortURLService) Ping() error {
-	return s.repo.Ping()
+func (s *ShortURLService) Ping(ctx context.Context) error {
+	return s.repo.Ping(ctx)
 }

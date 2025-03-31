@@ -1,21 +1,23 @@
 package storage
 
+import "context"
+
 type Repository interface {
-	Create(id string, originalURL string) string
-	Read(id string) string
-	Ping() error
+	Create(ctx context.Context, string, originalURL string) (string, error)
+	Read(ctx context.Context, id string) string
+	Ping(ctx context.Context) error
 }
 
 var memoryStorage map[string]string
 
 type MemoryRepo struct{}
 
-func (m MemoryRepo) Create(id string, originalURL string) string {
+func (m MemoryRepo) Create(ctx context.Context, id string, originalURL string) (string, error) {
 	memoryStorage[id] = originalURL
-	return id
+	return id, nil
 }
 
-func (m MemoryRepo) Read(id string) string {
+func (m MemoryRepo) Read(ctx context.Context, id string) string {
 	originalURL, ok := memoryStorage[id]
 	if !ok {
 		return ""
@@ -23,7 +25,7 @@ func (m MemoryRepo) Read(id string) string {
 	return originalURL
 }
 
-func (m MemoryRepo) Ping() error {
+func (m MemoryRepo) Ping(ctx context.Context) error {
 	return nil
 }
 

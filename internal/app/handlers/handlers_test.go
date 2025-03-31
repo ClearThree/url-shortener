@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"github.com/clearthree/url-shortener/internal/app/config"
@@ -159,7 +160,7 @@ func TestCreateShortURLHandler(t *testing.T) {
 
 			shortURLServiceMock := mocks.NewMockShortURLServiceInterface(ctrl)
 			if test.mockExpect {
-				shortURLServiceMock.EXPECT().Create(gomock.Any()).Return("http://localhost:8080/lelelele", nil)
+				shortURLServiceMock.EXPECT().Create(context.Background(), gomock.Any()).Return("http://localhost:8080/lelelele", nil)
 			}
 
 			body := strings.NewReader(test.requestPayload)
@@ -248,9 +249,9 @@ func TestRedirectToOriginalURLHandler(t *testing.T) {
 			defer ctrl.Finish()
 			shortURLServiceMock := mocks.NewMockShortURLServiceInterface(ctrl)
 			if test.mockValue != "" {
-				shortURLServiceMock.EXPECT().Read(test.mockValue).Return(test.want.response, nil)
+				shortURLServiceMock.EXPECT().Read(context.Background(), test.mockValue).Return(test.want.response, nil)
 			} else {
-				shortURLServiceMock.EXPECT().Read(gomock.Any()).Return("", service.ErrShortURLNotFound)
+				shortURLServiceMock.EXPECT().Read(context.Background(), gomock.Any()).Return("", service.ErrShortURLNotFound)
 			}
 			recorder := httptest.NewRecorder()
 			request := httptest.NewRequest(test.requestMethod, "/"+shortURL, nil)
@@ -351,7 +352,7 @@ func TestCreateJSONShortURLHandler_ServeHTTP(t *testing.T) {
 
 			shortURLServiceMock := mocks.NewMockShortURLServiceInterface(ctrl)
 			if test.mockExpect {
-				shortURLServiceMock.EXPECT().Create(gomock.Any()).Return("http://localhost:8080/lelelele", nil)
+				shortURLServiceMock.EXPECT().Create(context.Background(), gomock.Any()).Return("http://localhost:8080/lelelele", nil)
 			}
 			body := strings.NewReader(test.requestPayload)
 			request := httptest.NewRequest(http.MethodPost, "/", body)
@@ -436,9 +437,9 @@ func TestPingHandler_ServeHTTP(t *testing.T) {
 
 			shortURLServiceMock := mocks.NewMockShortURLServiceInterface(ctrl)
 			if test.wantSuccess {
-				shortURLServiceMock.EXPECT().Ping().Return(nil)
+				shortURLServiceMock.EXPECT().Ping(context.Background()).Return(nil)
 			} else {
-				shortURLServiceMock.EXPECT().Ping().Return(errors.New("database is not available"))
+				shortURLServiceMock.EXPECT().Ping(context.Background()).Return(errors.New("database is not available"))
 			}
 			request := httptest.NewRequest(http.MethodGet, "/ping", nil)
 			recorder := httptest.NewRecorder()

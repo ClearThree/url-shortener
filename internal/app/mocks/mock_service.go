@@ -5,6 +5,7 @@
 package mocks
 
 import (
+	context "context"
 	reflect "reflect"
 
 	gomock "github.com/golang/mock/gomock"
@@ -34,45 +35,45 @@ func (m *MockShortURLServiceInterface) EXPECT() *MockShortURLServiceInterfaceMoc
 }
 
 // Create mocks base method.
-func (m *MockShortURLServiceInterface) Create(arg0 string) (string, error) {
+func (m *MockShortURLServiceInterface) Create(arg0 context.Context, arg1 string) (string, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Create", arg0)
+	ret := m.ctrl.Call(m, "Create", arg0, arg1)
 	ret0, _ := ret[0].(string)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // Create indicates an expected call of Create.
-func (mr *MockShortURLServiceInterfaceMockRecorder) Create(arg0 interface{}) *gomock.Call {
+func (mr *MockShortURLServiceInterfaceMockRecorder) Create(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Create", reflect.TypeOf((*MockShortURLServiceInterface)(nil).Create), arg0)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Create", reflect.TypeOf((*MockShortURLServiceInterface)(nil).Create), arg0, arg1)
 }
 
 // Ping mocks base method.
-func (m *MockShortURLServiceInterface) Ping() error {
+func (m *MockShortURLServiceInterface) Ping(arg0 context.Context) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Ping")
+	ret := m.ctrl.Call(m, "Ping", arg0)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // Ping indicates an expected call of Ping.
-func (mr *MockShortURLServiceInterfaceMockRecorder) Ping() *gomock.Call {
+func (mr *MockShortURLServiceInterfaceMockRecorder) Ping(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Ping", reflect.TypeOf((*MockShortURLServiceInterface)(nil).Ping))
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Ping", reflect.TypeOf((*MockShortURLServiceInterface)(nil).Ping), arg0)
 }
 
 // Read mocks base method.
-func (m *MockShortURLServiceInterface) Read(arg0 string) (string, error) {
+func (m *MockShortURLServiceInterface) Read(arg0 context.Context, arg1 string) (string, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Read", arg0)
+	ret := m.ctrl.Call(m, "Read", arg0, arg1)
 	ret0, _ := ret[0].(string)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // Read indicates an expected call of Read.
-func (mr *MockShortURLServiceInterfaceMockRecorder) Read(arg0 interface{}) *gomock.Call {
+func (mr *MockShortURLServiceInterfaceMockRecorder) Read(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Read", reflect.TypeOf((*MockShortURLServiceInterface)(nil).Read), arg0)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Read", reflect.TypeOf((*MockShortURLServiceInterface)(nil).Read), arg0, arg1)
 }
