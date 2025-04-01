@@ -32,6 +32,7 @@ func ShortenURLRouter(pool *sql.DB) chi.Router {
 	var redirectHandler = handlers.NewRedirectToOriginalURLHandler(&shortURLService)
 	var shortURLServiceDB = service.NewService(storage.NewDBRepo(pool))
 	var pingHandler = handlers.NewPingHandler(&shortURLServiceDB)
+	var batchCreateHandler = handlers.NewBatchCreateShortURLHandler(&shortURLService)
 
 	router := chi.NewRouter()
 	router.Use(middlewares.RequestLogger)
@@ -39,6 +40,7 @@ func ShortenURLRouter(pool *sql.DB) chi.Router {
 	router.Use(middleware.Recoverer)
 	router.Post("/", createHandler.ServeHTTP)
 	router.Post("/api/shorten", createJSONShortURLHandler.ServeHTTP)
+	router.Post("/api/shorten/batch", batchCreateHandler.ServeHTTP)
 	router.Get("/{id}", redirectHandler.ServeHTTP)
 	router.Get("/ping", pingHandler.ServeHTTP)
 	return router

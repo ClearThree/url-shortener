@@ -6,6 +6,7 @@ import (
 	"errors"
 	"github.com/clearthree/url-shortener/internal/app/config"
 	"github.com/clearthree/url-shortener/internal/app/logger"
+	"github.com/clearthree/url-shortener/internal/app/models"
 	"io"
 	"os"
 )
@@ -78,6 +79,37 @@ func (f *FileWrapper) Create(id string, originalURL string) (int32, error) {
 	}
 	f.lastUUID++
 	err = f.writer.Flush()
+	if err != nil {
+		return 0, err
+	}
+	return f.lastUUID, nil
+}
+
+func (f *FileWrapper) BatchCreate(URLs map[string]models.ShortenBatchItemRequest) (int32, error) {
+	if f.file == nil {
+		err := f.Open()
+		if err != nil {
+			return 0, err
+		}
+	}
+	for id, item := range URLs {
+		row := FileRow{
+			UUID:        f.lastUUID + 1,
+			ShortURL:    id,
+			OriginalURL: item.OriginalURL,
+		}
+		data, err := json.Marshal(&row)
+		if err != nil {
+			return 0, err
+		}
+		data = append(data, '\n')
+		_, err = f.writer.Write(data)
+		if err != nil {
+			return 0, err
+		}
+		f.lastUUID++
+	}
+	err := f.writer.Flush()
 	if err != nil {
 		return 0, err
 	}

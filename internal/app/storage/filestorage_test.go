@@ -3,6 +3,7 @@ package storage
 import (
 	"bufio"
 	"bytes"
+	"github.com/clearthree/url-shortener/internal/app/models"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"os"
@@ -251,6 +252,69 @@ func TestFileWrapper_openReadOnly(t *testing.T) {
 			stat, err := f.file.Stat()
 			require.NoError(t, err)
 			assert.Equal(t, stat.Mode(), os.FileMode(0644))
+		})
+	}
+}
+
+func TestFileWrapper_BatchCreate(t *testing.T) {
+	type fields struct {
+		file     *os.File
+		reader   *bufio.Reader
+		writer   *bufio.Writer
+		lastUUID int32
+	}
+	type args struct {
+		URLs map[string]models.ShortenBatchItemRequest
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		args   args
+		want   int32
+	}{
+		{
+			name: "success with batch of 2",
+			fields: fields{
+				file:     nil,
+				reader:   nil,
+				writer:   nil,
+				lastUUID: 0,
+			},
+			args: args{
+				URLs: map[string]models.ShortenBatchItemRequest{
+					"lele": {CorrelationID: "lelele", OriginalURL: "https://ya.ru"},
+					"lolo": {CorrelationID: "lololo", OriginalURL: "https://yandex.ru"},
+				},
+			},
+			want: 2,
+		},
+		{
+			name: "success with single URL in batch",
+			fields: fields{
+				file:     nil,
+				reader:   nil,
+				writer:   nil,
+				lastUUID: 5,
+			},
+			args: args{
+				URLs: map[string]models.ShortenBatchItemRequest{
+					"lele": {CorrelationID: "lelele", OriginalURL: "https://ya.ru"},
+				},
+			},
+			want: 6,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			f := &FileWrapper{
+				file:     tt.fields.file,
+				reader:   tt.fields.reader,
+				writer:   tt.fields.writer,
+				lastUUID: tt.fields.lastUUID,
+			}
+			got, err := f.BatchCreate(tt.args.URLs)
+			require.NoError(t, err)
+			assert.Equalf(t, tt.want, got, "BatchCreate(%v)", tt.args.URLs)
 		})
 	}
 }

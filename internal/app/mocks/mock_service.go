@@ -8,6 +8,7 @@ import (
 	context "context"
 	reflect "reflect"
 
+	models "github.com/clearthree/url-shortener/internal/app/models"
 	gomock "github.com/golang/mock/gomock"
 )
 
@@ -32,6 +33,21 @@ func NewMockShortURLServiceInterface(ctrl *gomock.Controller) *MockShortURLServi
 // EXPECT returns an object that allows the caller to indicate expected use.
 func (m *MockShortURLServiceInterface) EXPECT() *MockShortURLServiceInterfaceMockRecorder {
 	return m.recorder
+}
+
+// BatchCreate mocks base method.
+func (m *MockShortURLServiceInterface) BatchCreate(arg0 context.Context, arg1 []models.ShortenBatchItemRequest) ([]models.ShortenBatchItemResponse, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "BatchCreate", arg0, arg1)
+	ret0, _ := ret[0].([]models.ShortenBatchItemResponse)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// BatchCreate indicates an expected call of BatchCreate.
+func (mr *MockShortURLServiceInterfaceMockRecorder) BatchCreate(arg0, arg1 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "BatchCreate", reflect.TypeOf((*MockShortURLServiceInterface)(nil).BatchCreate), arg0, arg1)
 }
 
 // Create mocks base method.

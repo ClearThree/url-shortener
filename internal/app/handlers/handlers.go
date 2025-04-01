@@ -142,7 +142,7 @@ func (create CreateJSONShortURLHandler) ServeHTTP(writer http.ResponseWriter, re
 	writer.WriteHeader(http.StatusCreated)
 	enc := json.NewEncoder(writer)
 	responseData := models.ShortenResponse{Result: id}
-	if err := enc.Encode(responseData); err != nil {
+	if err = enc.Encode(responseData); err != nil {
 		logger.Log.Debugf("Error encoding response: %s", err)
 		return
 	}
@@ -160,5 +160,51 @@ func (ping PingHandler) ServeHTTP(writer http.ResponseWriter, request *http.Requ
 	err := ping.service.Ping(request.Context())
 	if err != nil {
 		http.Error(writer, "Database is not available", http.StatusInternalServerError)
+	}
+}
+
+type BatchCreateShortURLHandler struct {
+	service service.ShortURLServiceInterface
+}
+
+func NewBatchCreateShortURLHandler(service service.ShortURLServiceInterface) *BatchCreateShortURLHandler {
+	return &BatchCreateShortURLHandler{service: service}
+}
+
+func (create BatchCreateShortURLHandler) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
+	if contentType := request.Header.Get("Content-Type"); !strings.Contains(contentType, "application/json") {
+		http.Error(writer, "Only application/json content type is allowed", http.StatusBadRequest)
+		return
+	}
+	defer request.Body.Close()
+
+	var requestData []models.ShortenBatchItemRequest
+	dec := json.NewDecoder(request.Body)
+	if err := dec.Decode(&requestData); err != nil {
+		logger.Log.Debugf("Couldn't decode the request body: %s", err)
+		writer.WriteHeader(http.StatusBadRequest)
+		return
+	}
+	if len(requestData) == 0 {
+		http.Error(writer, "Please provide a batch of URLs", http.StatusBadRequest)
+		return
+	}
+	for _, requestItem := range requestData {
+		if !isURL(requestItem.OriginalURL) {
+			http.Error(writer, "One of the provided items is not a valid URL", http.StatusBadRequest)
+			return
+		}
+	}
+	results, err := create.service.BatchCreate(request.Context(), requestData)
+	if err != nil {
+		http.Error(writer, "Couldn't create short url", http.StatusBadRequest)
+		return
+	}
+	writer.Header().Add("Content-Type", "application/json")
+	writer.WriteHeader(http.StatusCreated)
+	enc := json.NewEncoder(writer)
+	if err = enc.Encode(results); err != nil {
+		logger.Log.Debugf("Error encoding response: %s", err)
+		return
 	}
 }

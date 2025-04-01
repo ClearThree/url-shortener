@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"github.com/clearthree/url-shortener/internal/app/config"
+	"github.com/clearthree/url-shortener/internal/app/models"
 	"github.com/clearthree/url-shortener/internal/app/storage"
 	"math/rand"
 )
@@ -25,6 +26,7 @@ type ShortURLServiceInterface interface {
 	Create(ctx context.Context, originalURL string) (string, error)
 	Read(ctx context.Context, id string) (string, error)
 	Ping(ctx context.Context) error
+	BatchCreate(ctx context.Context, requestData []models.ShortenBatchItemRequest) ([]models.ShortenBatchItemResponse, error)
 }
 type ShortURLService struct {
 	repo storage.Repository
@@ -70,4 +72,26 @@ func (s *ShortURLService) FillRow(ctx context.Context, originalURL string, short
 
 func (s *ShortURLService) Ping(ctx context.Context) error {
 	return s.repo.Ping(ctx)
+}
+
+func (s *ShortURLService) BatchCreate(
+	ctx context.Context, requestData []models.ShortenBatchItemRequest) ([]models.ShortenBatchItemResponse, error) {
+	URLs := make(map[string]models.ShortenBatchItemRequest)
+	for _, item := range requestData {
+		shortURL := generateID()
+		URLs[shortURL] = item
+	}
+	result, err := s.repo.BatchCreate(ctx, URLs)
+	if err != nil {
+		return nil, err
+	}
+	for i := 0; i < len(result); i++ {
+		data := &result[i]
+		data.ShortURL = config.Settings.HostedOn + data.ShortURL
+	}
+	_, err = storage.FSWrapper.BatchCreate(URLs)
+	if err != nil {
+		return nil, err
+	}
+	return result, nil
 }

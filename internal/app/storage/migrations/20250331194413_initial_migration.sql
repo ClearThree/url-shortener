@@ -1,8 +1,10 @@
 -- +goose Up
 -- +goose StatementBegin
 CREATE TABLE IF NOT EXISTS short_url(
-    id varchar NOT NULL,
-    original_url varchar NOT NULL,
+    id bigserial PRIMARY KEY,
+    short_url text NOT NULL,
+    original_url text NOT NULL,
+    correlation_id text,
     created_at timestamp default NOW()
 );
 -- +goose StatementEnd

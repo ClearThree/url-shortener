@@ -2,8 +2,11 @@ package storage
 
 import (
 	"context"
+	"fmt"
+	"github.com/clearthree/url-shortener/internal/app/models"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"reflect"
 	"testing"
 )
 
@@ -88,6 +91,79 @@ func TestMemoryRepo_Read(t *testing.T) {
 			}
 			got := m.Read(tt.args.ctx, tt.args.id)
 			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
+func TestMemoryRepo_Ping(t *testing.T) {
+	type args struct {
+		in0 context.Context
+	}
+	tests := []struct {
+		name    string
+		args    args
+		wantErr assert.ErrorAssertionFunc
+	}{
+		{
+			name: "Successful ping",
+			args: args{
+				context.Background(),
+			},
+			wantErr: assert.NoError,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			m := MemoryRepo{}
+			tt.wantErr(t, m.Ping(tt.args.in0), fmt.Sprintf("Ping(%v)", tt.args.in0))
+		})
+	}
+}
+
+func TestMemoryRepo_BatchCreate(t *testing.T) {
+	type args struct {
+		ctx  context.Context
+		URLs map[string]models.ShortenBatchItemRequest
+	}
+	tests := []struct {
+		name string
+		args args
+		want []models.ShortenBatchItemResponse
+	}{
+		{
+			name: "Successful batch create",
+			args: args{
+				ctx: context.Background(),
+				URLs: map[string]models.ShortenBatchItemRequest{
+					"lele": {CorrelationID: "lelele", OriginalURL: "https://ya.ru"},
+					"lolo": {CorrelationID: "lololo", OriginalURL: "https://yandex.ru"},
+				},
+			},
+			want: []models.ShortenBatchItemResponse{
+				{CorrelationID: "lelele", ShortURL: "lele"},
+				{CorrelationID: "lololo", ShortURL: "lolo"},
+			},
+		},
+		{
+			name: "Successful batch create for single URL",
+			args: args{
+				ctx: context.Background(),
+				URLs: map[string]models.ShortenBatchItemRequest{
+					"lele": {CorrelationID: "lelele", OriginalURL: "https://ya.ru"},
+				},
+			},
+			want: []models.ShortenBatchItemResponse{
+				{CorrelationID: "lelele", ShortURL: "lele"},
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			m := MemoryRepo{}
+			got, err := m.BatchCreate(tt.args.ctx, tt.args.URLs)
+			require.NoError(t, err)
+			eq := reflect.DeepEqual(got, tt.want)
+			assert.Equal(t, eq, true)
 		})
 	}
 }

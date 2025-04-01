@@ -2,8 +2,12 @@ package service
 
 import (
 	"context"
+	"fmt"
 	"github.com/clearthree/url-shortener/internal/app/config"
+	"github.com/clearthree/url-shortener/internal/app/mocks"
+	"github.com/clearthree/url-shortener/internal/app/models"
 	"github.com/clearthree/url-shortener/internal/app/storage"
+	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
 
 	"testing"
@@ -13,7 +17,7 @@ type RepoMock struct {
 	localStorage map[string]string
 }
 
-func (rm RepoMock) Create(ctx context.Context, id string, originalURL string) (string, error) {
+func (rm RepoMock) Create(_ context.Context, id string, originalURL string) (string, error) {
 	if rm.localStorage == nil {
 		rm.localStorage = make(map[string]string)
 	}
@@ -21,7 +25,7 @@ func (rm RepoMock) Create(ctx context.Context, id string, originalURL string) (s
 	return id, nil
 }
 
-func (rm RepoMock) Read(ctx context.Context, id string) string {
+func (rm RepoMock) Read(_ context.Context, id string) string {
 	if rm.localStorage == nil {
 		rm.localStorage = make(map[string]string)
 	}
@@ -32,8 +36,20 @@ func (rm RepoMock) Read(ctx context.Context, id string) string {
 	return originalURL
 }
 
-func (rm RepoMock) Ping(ctx context.Context) error {
+func (rm RepoMock) Ping(_ context.Context) error {
 	return nil
+}
+
+func (rm RepoMock) BatchCreate(ctx context.Context, URLs map[string]models.ShortenBatchItemRequest) ([]models.ShortenBatchItemResponse, error) {
+	results := make([]models.ShortenBatchItemResponse, 0, len(URLs))
+	for shortURL, data := range URLs {
+		result, err := rm.Create(ctx, shortURL, data.OriginalURL)
+		if err != nil {
+			return nil, err
+		}
+		results = append(results, models.ShortenBatchItemResponse{CorrelationID: data.CorrelationID, ShortURL: result})
+	}
+	return results, nil
 }
 
 func TestNewService(t *testing.T) {
@@ -210,6 +226,74 @@ func Test_generateID(t *testing.T) {
 			got := generateID()
 			assert.Equal(t, tt.wantLength, len(got))
 
+		})
+	}
+}
+
+func TestShortURLService_BatchCreate(t *testing.T) {
+	type args struct {
+		ctx         context.Context
+		requestData []models.ShortenBatchItemRequest
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    []models.ShortenBatchItemResponse
+		wantErr assert.ErrorAssertionFunc
+	}{
+		{
+			name: "Successful batch creation",
+			args: args{
+				ctx: context.Background(),
+				requestData: []models.ShortenBatchItemRequest{
+					{CorrelationID: "lele", OriginalURL: "https://ya.ru"},
+					{CorrelationID: "lolo", OriginalURL: "https://yandex.ru"},
+				},
+			},
+			want: []models.ShortenBatchItemResponse{
+				{CorrelationID: "lele", ShortURL: config.Settings.HostedOn + "lelele"},
+				{CorrelationID: "lolo", ShortURL: config.Settings.HostedOn + "lelele"},
+			},
+			wantErr: assert.NoError,
+		},
+		{
+			name: "Successful batch creation for single URL",
+			args: args{
+				ctx: context.Background(),
+				requestData: []models.ShortenBatchItemRequest{
+					{CorrelationID: "lele", OriginalURL: "https://ya.ru"},
+				},
+			},
+			want: []models.ShortenBatchItemResponse{
+				{CorrelationID: "lele", ShortURL: config.Settings.HostedOn + "lelele"},
+			},
+			wantErr: assert.NoError,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			defer ctrl.Finish()
+
+			repoMock := mocks.NewMockRepository(ctrl)
+			s := &ShortURLService{
+				repo: repoMock,
+			}
+			var returnStruct []models.ShortenBatchItemResponse
+			for _, requestItem := range tt.args.requestData {
+				returnStruct = append(returnStruct, models.ShortenBatchItemResponse{
+					CorrelationID: requestItem.CorrelationID,
+					ShortURL:      "lelele",
+				})
+			}
+			repoMock.EXPECT().
+				BatchCreate(context.Background(), gomock.Any()).
+				Return(returnStruct, nil)
+			got, err := s.BatchCreate(tt.args.ctx, tt.args.requestData)
+			if !tt.wantErr(t, err, fmt.Sprintf("BatchCreate(%v, %v)", tt.args.ctx, tt.args.requestData)) {
+				return
+			}
+			assert.Equalf(t, tt.want, got, "BatchCreate(%v, %v)", tt.args.ctx, tt.args.requestData)
 		})
 	}
 }

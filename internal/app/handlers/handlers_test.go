@@ -426,7 +426,7 @@ func TestPingHandler_ServeHTTP(t *testing.T) {
 			wantSuccess: false,
 			want: want{
 				code:       500,
-				errMessage: "Database is not available",
+				errMessage: "Database is not available\n",
 			},
 		},
 	}
@@ -448,6 +448,159 @@ func TestPingHandler_ServeHTTP(t *testing.T) {
 			res := recorder.Result()
 			defer res.Body.Close()
 			assert.Equal(t, test.want.code, res.StatusCode)
+			if res.StatusCode > http.StatusOK {
+				resBody, err := io.ReadAll(res.Body)
+				require.NoError(t, err)
+				assert.Equal(t, test.want.errMessage, string(resBody))
+			}
+		})
+	}
+}
+
+func TestNewBatchCreateShortURLHandler(t *testing.T) {
+	type args struct {
+		service service.ShortURLServiceInterface
+	}
+	tests := []struct {
+		name string
+		args args
+		want *BatchCreateShortURLHandler
+	}{
+		{
+			name: "success",
+			args: args{
+				service: &ServiceForTest,
+			},
+			want: &BatchCreateShortURLHandler{
+				service: &ServiceForTest,
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equalf(t, tt.want, NewBatchCreateShortURLHandler(tt.args.service), "NewBatchCreateShortURLHandler(%v)", tt.args.service)
+		})
+	}
+}
+
+func TestBatchCreateShortURLHandler_ServeHTTP(t *testing.T) {
+	type want struct {
+		code        int
+		contentType string
+		payload     []models.ShortenBatchItemResponse
+		errMessage  string
+	}
+	tests := []struct {
+		name               string
+		requestPayload     string
+		requestContentType string
+		mockExpect         bool
+		want               want
+	}{
+		{
+			name: "Successful creation of batch for short url",
+			requestPayload: `[
+				{"original_url": "https://ya.ru", "correlation_id": "lelele"},
+				{"original_url": "https://yandex.ru", "correlation_id": "lololo"}
+			]`,
+			requestContentType: "application/json",
+			mockExpect:         true,
+			want: want{
+				code:        201,
+				contentType: "application/json",
+				payload: []models.ShortenBatchItemResponse{
+					{CorrelationID: "lelele", ShortURL: "http://localhost:8080/LELELELE"},
+					{CorrelationID: "lololo", ShortURL: "http://localhost:8080/LELELELE"},
+				},
+				errMessage: "",
+			},
+		},
+		{
+			name:               "Successful creation of batch for short url with single url",
+			requestPayload:     `[{"original_url": "https://ya.ru", "correlation_id": "lelele"}]`,
+			requestContentType: "application/json",
+			mockExpect:         true,
+			want: want{
+				code:        201,
+				contentType: "application/json",
+				payload: []models.ShortenBatchItemResponse{
+					{CorrelationID: "lelele", ShortURL: "http://localhost:8080/LELELELE"},
+				},
+				errMessage: "",
+			},
+		},
+		{
+			name:               "Unsuccessful creation of batch for short url with empty batch",
+			requestPayload:     `[]`,
+			requestContentType: "application/json",
+			mockExpect:         false,
+			want: want{
+				code:        400,
+				contentType: "application/json",
+				payload:     nil,
+				errMessage:  "Please provide a batch of URLs\n",
+			},
+		},
+		{
+			name: "Successful creation of batch for short url",
+			requestPayload: `[
+				{"original_url": "lele://ya.ru", "correlation_id": "lelele"},
+				{"original_url": "https://yandex.ru", "correlation_id": "lololo"}
+			]`,
+			requestContentType: "application/json",
+			mockExpect:         false,
+			want: want{
+				code:        400,
+				contentType: "application/json",
+				payload:     nil,
+				errMessage:  "One of the provided items is not a valid URL\n",
+			},
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			defer ctrl.Finish()
+
+			shortURLServiceMock := mocks.NewMockShortURLServiceInterface(ctrl)
+			if test.mockExpect {
+				var requestData []models.ShortenBatchItemRequest
+				dec := json.NewDecoder(strings.NewReader(test.requestPayload))
+				if err := dec.Decode(&requestData); err != nil {
+					require.NoError(t, err, "failed to decode test.requestPayload")
+				}
+				var returnStruct []models.ShortenBatchItemResponse
+				for _, requestItem := range requestData {
+					returnStruct = append(returnStruct, models.ShortenBatchItemResponse{
+						CorrelationID: requestItem.CorrelationID,
+						ShortURL:      "http://localhost:8080/LELELELE",
+					})
+				}
+				shortURLServiceMock.EXPECT().
+					BatchCreate(context.Background(), requestData).
+					Return(returnStruct, nil)
+			}
+			body := strings.NewReader(test.requestPayload)
+			request := httptest.NewRequest(http.MethodPost, "/", body)
+			request.Header.Add("Content-Type", test.requestContentType)
+			recorder := httptest.NewRecorder()
+			handler := NewBatchCreateShortURLHandler(shortURLServiceMock)
+			handler.ServeHTTP(recorder, request)
+			res := recorder.Result()
+			assert.Equal(t, test.want.code, res.StatusCode)
+			defer res.Body.Close()
+			if test.want.errMessage != "" {
+				resBody, err := io.ReadAll(res.Body)
+				require.NoError(t, err)
+				assert.Equal(t, test.want.errMessage, string(resBody))
+				return
+			}
+			var responseData []models.ShortenBatchItemResponse
+			dec := json.NewDecoder(res.Body)
+			err := dec.Decode(&responseData)
+			require.NoError(t, err)
+			assert.Equal(t, test.want.payload, responseData)
+			assert.Equal(t, test.want.contentType, res.Header.Get("Content-Type"))
 		})
 	}
 }
