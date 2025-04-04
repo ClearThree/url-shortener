@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"github.com/clearthree/url-shortener/internal/app/config"
 	"github.com/clearthree/url-shortener/internal/app/mocks"
@@ -117,6 +118,62 @@ func TestShortURLService_Create(t *testing.T) {
 			assert.IsType(t, "", got)
 			assert.NotEmpty(t, got)
 			assert.Contains(t, got, config.Settings.HostedOn)
+		})
+	}
+}
+
+func TestShortURLService_CreateWithError(t *testing.T) {
+	type args struct {
+		ctx         context.Context
+		originalURL string
+	}
+	tests := []struct {
+		name           string
+		args           args
+		mockReturns    string
+		mockReturnsErr error
+		want           string
+		wantErr        bool
+	}{
+		{
+			name:           "Creation of short URL with already existing originalURL",
+			args:           args{ctx: context.Background(), originalURL: "https://ya.ru"},
+			mockReturns:    "lelelele",
+			mockReturnsErr: storage.ErrAlreadyExists,
+			want:           "http://localhost:8080/lelelele",
+			wantErr:        true,
+		},
+		{
+			name:           "Creation of short URL with some other error",
+			args:           args{ctx: context.Background(), originalURL: "https://ya.ru"},
+			mockReturns:    "",
+			mockReturnsErr: errors.New("some error"),
+			want:           "",
+			wantErr:        true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			defer ctrl.Finish()
+
+			repoMock := mocks.NewMockRepository(ctrl)
+			s := &ShortURLService{
+				repo: repoMock,
+			}
+			repoMock.EXPECT().
+				Read(tt.args.ctx, gomock.Any()).
+				Return("")
+			repoMock.EXPECT().
+				Create(tt.args.ctx, gomock.Any(), tt.args.originalURL).
+				Return(tt.mockReturns, tt.mockReturnsErr)
+			got, err := s.Create(tt.args.ctx, tt.args.originalURL)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("Create() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			assert.ErrorIs(t, err, tt.mockReturnsErr)
+			assert.Equal(t, tt.want, got)
 		})
 	}
 }
@@ -287,7 +344,7 @@ func TestShortURLService_BatchCreate(t *testing.T) {
 				})
 			}
 			repoMock.EXPECT().
-				BatchCreate(context.Background(), gomock.Any()).
+				BatchCreate(tt.args.ctx, gomock.Any()).
 				Return(returnStruct, nil)
 			got, err := s.BatchCreate(tt.args.ctx, tt.args.requestData)
 			if !tt.wantErr(t, err, fmt.Sprintf("BatchCreate(%v, %v)", tt.args.ctx, tt.args.requestData)) {

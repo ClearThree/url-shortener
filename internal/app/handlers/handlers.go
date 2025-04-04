@@ -5,6 +5,7 @@ import (
 	"errors"
 	"github.com/clearthree/url-shortener/internal/app/logger"
 	"github.com/clearthree/url-shortener/internal/app/models"
+	"github.com/clearthree/url-shortener/internal/app/storage"
 	"io"
 	"net/http"
 	"net/url"
@@ -64,15 +65,22 @@ func (create CreateShortURLHandler) ServeHTTP(writer http.ResponseWriter, reques
 	}
 	id, err := create.service.Create(request.Context(), payloadString)
 	if err != nil {
+		if errors.Is(err, storage.ErrAlreadyExists) {
+			create.writeResponse(writer, http.StatusConflict, id)
+			return
+		}
 		http.Error(writer, "Couldn't create short url", http.StatusBadRequest)
 		return
 	}
+	create.writeResponse(writer, http.StatusCreated, id)
+}
+
+func (create CreateShortURLHandler) writeResponse(writer http.ResponseWriter, statusCode int, body string) {
 	writer.Header().Add("Content-Type", "text/plain")
-	writer.WriteHeader(http.StatusCreated)
-	_, err = writer.Write([]byte(id))
+	writer.WriteHeader(statusCode)
+	_, err := writer.Write([]byte(body))
 	if err != nil {
 		http.Error(writer, "Couldn't write the response body", http.StatusBadRequest)
-		return
 	}
 }
 
@@ -135,15 +143,24 @@ func (create CreateJSONShortURLHandler) ServeHTTP(writer http.ResponseWriter, re
 	}
 	id, err := create.service.Create(request.Context(), requestData.URL)
 	if err != nil {
+		if errors.Is(err, storage.ErrAlreadyExists) {
+			create.writeResponse(writer, http.StatusConflict, id)
+			return
+		}
 		http.Error(writer, "Couldn't create short url", http.StatusBadRequest)
 		return
 	}
+	create.writeResponse(writer, http.StatusCreated, id)
+}
+
+func (create CreateJSONShortURLHandler) writeResponse(writer http.ResponseWriter, statusCode int, body string) {
 	writer.Header().Add("Content-Type", "application/json")
-	writer.WriteHeader(http.StatusCreated)
+	writer.WriteHeader(statusCode)
 	enc := json.NewEncoder(writer)
-	responseData := models.ShortenResponse{Result: id}
-	if err = enc.Encode(responseData); err != nil {
+	responseData := models.ShortenResponse{Result: body}
+	if err := enc.Encode(responseData); err != nil {
 		logger.Log.Debugf("Error encoding response: %s", err)
+		http.Error(writer, "Error encoding response body", http.StatusInternalServerError)
 		return
 	}
 }

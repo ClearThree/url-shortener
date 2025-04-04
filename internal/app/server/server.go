@@ -60,7 +60,8 @@ func Run(addr string) error {
 		if err = Pool.PingContext(ctx); err != nil {
 			return err
 		}
-		if migrateDB(Pool) != nil {
+		err = migrateDB(Pool)
+		if err != nil {
 			return err
 		}
 	} else {

@@ -58,6 +58,8 @@ func TestCreateShortURLHandler(t *testing.T) {
 		requestMethod        string
 		requestContentType   string
 		requestContentLength string
+		mockReturns          string
+		mockReturnsError     error
 		mockExpect           bool
 		want                 want
 	}{
@@ -67,9 +69,11 @@ func TestCreateShortURLHandler(t *testing.T) {
 			requestMethod:        http.MethodPost,
 			requestContentType:   "text/plain",
 			requestContentLength: "",
+			mockReturns:          "http://localhost:8080/lelelele",
+			mockReturnsError:     nil,
 			mockExpect:           true,
 			want: want{
-				code:        201,
+				code:        http.StatusCreated,
 				response:    `http://localhost:8080/lelelele`,
 				contentType: "text/plain",
 			},
@@ -80,9 +84,11 @@ func TestCreateShortURLHandler(t *testing.T) {
 			requestMethod:        http.MethodPost,
 			requestContentType:   "application/x-gzip",
 			requestContentLength: "",
+			mockReturns:          "http://localhost:8080/lelelele",
+			mockReturnsError:     nil,
 			mockExpect:           true,
 			want: want{
-				code:        201,
+				code:        http.StatusCreated,
 				response:    `http://localhost:8080/lelelele`,
 				contentType: "text/plain",
 			},
@@ -93,9 +99,11 @@ func TestCreateShortURLHandler(t *testing.T) {
 			requestMethod:        http.MethodPost,
 			requestContentType:   "application/json",
 			requestContentLength: "",
+			mockReturns:          "",
+			mockReturnsError:     nil,
 			mockExpect:           false,
 			want: want{
-				code:        400,
+				code:        http.StatusBadRequest,
 				response:    `Only text/plain or application/x-gzip content types are allowed`,
 				contentType: "text/plain; charset=utf-8",
 			},
@@ -106,9 +114,11 @@ func TestCreateShortURLHandler(t *testing.T) {
 			requestMethod:        http.MethodPost,
 			requestContentType:   "text/plain",
 			requestContentLength: "писятДва",
+			mockReturns:          "",
+			mockReturnsError:     nil,
 			mockExpect:           false,
 			want: want{
-				code:        400,
+				code:        http.StatusBadRequest,
 				response:    `Content-Length header is invalid, should be integer`,
 				contentType: "text/plain; charset=utf-8",
 			},
@@ -119,9 +129,11 @@ func TestCreateShortURLHandler(t *testing.T) {
 			requestMethod:        http.MethodPost,
 			requestContentType:   "text/plain",
 			requestContentLength: strconv.FormatInt(maxPayloadSize+1, 10),
+			mockReturns:          "",
+			mockReturnsError:     nil,
 			mockExpect:           false,
 			want: want{
-				code:        400,
+				code:        http.StatusBadRequest,
 				response:    `Content is too large`,
 				contentType: "text/plain; charset=utf-8",
 			},
@@ -134,7 +146,7 @@ func TestCreateShortURLHandler(t *testing.T) {
 			requestContentLength: "",
 			mockExpect:           false,
 			want: want{
-				code:        400,
+				code:        http.StatusBadRequest,
 				response:    `Please provide an url`,
 				contentType: "text/plain; charset=utf-8",
 			},
@@ -145,10 +157,42 @@ func TestCreateShortURLHandler(t *testing.T) {
 			requestMethod:        http.MethodPost,
 			requestContentType:   "text/plain",
 			requestContentLength: "",
+			mockReturns:          "",
+			mockReturnsError:     nil,
 			mockExpect:           false,
 			want: want{
-				code:        400,
+				code:        http.StatusBadRequest,
 				response:    `The provided payload is not a valid URL`,
+				contentType: "text/plain; charset=utf-8",
+			},
+		},
+		{
+			name:                 "Successful short url return with conflict",
+			requestPayload:       "https://ya.ru",
+			requestMethod:        http.MethodPost,
+			requestContentType:   "text/plain",
+			requestContentLength: "",
+			mockReturns:          "http://localhost:8080/lelelele",
+			mockReturnsError:     storage.ErrAlreadyExists,
+			mockExpect:           true,
+			want: want{
+				code:        http.StatusConflict,
+				response:    `http://localhost:8080/lelelele`,
+				contentType: "text/plain",
+			},
+		},
+		{
+			name:                 "Successful short url return with conflict",
+			requestPayload:       "https://ya.ru",
+			requestMethod:        http.MethodPost,
+			requestContentType:   "text/plain",
+			requestContentLength: "",
+			mockReturns:          "http://localhost:8080/lelelele",
+			mockReturnsError:     errors.New("blablabla"),
+			mockExpect:           true,
+			want: want{
+				code:        http.StatusBadRequest,
+				response:    "",
 				contentType: "text/plain; charset=utf-8",
 			},
 		},
@@ -160,7 +204,9 @@ func TestCreateShortURLHandler(t *testing.T) {
 
 			shortURLServiceMock := mocks.NewMockShortURLServiceInterface(ctrl)
 			if test.mockExpect {
-				shortURLServiceMock.EXPECT().Create(context.Background(), gomock.Any()).Return("http://localhost:8080/lelelele", nil)
+				shortURLServiceMock.EXPECT().
+					Create(context.Background(), gomock.Any()).
+					Return(test.mockReturns, test.mockReturnsError)
 			}
 
 			body := strings.NewReader(test.requestPayload)
@@ -226,7 +272,7 @@ func TestRedirectToOriginalURLHandler(t *testing.T) {
 			requestMethod: http.MethodGet,
 			mockValue:     "lelelele",
 			want: want{
-				code:     307,
+				code:     http.StatusTemporaryRedirect,
 				response: "https://ya.ru",
 				header:   "Location",
 			},
@@ -236,7 +282,7 @@ func TestRedirectToOriginalURLHandler(t *testing.T) {
 			requestMethod: http.MethodGet,
 			mockValue:     "",
 			want: want{
-				code:     404,
+				code:     http.StatusNotFound,
 				response: "Short url not found",
 				header:   "",
 			},
@@ -260,7 +306,7 @@ func TestRedirectToOriginalURLHandler(t *testing.T) {
 			handler.ServeHTTP(recorder, request)
 			res := recorder.Result()
 			assert.Equal(t, test.want.code, res.StatusCode)
-			if res.StatusCode >= 400 {
+			if res.StatusCode >= http.StatusBadRequest {
 				defer res.Body.Close()
 				resBody, err := io.ReadAll(res.Body)
 				require.NoError(t, err)
@@ -317,7 +363,7 @@ func TestCreateJSONShortURLHandler_ServeHTTP(t *testing.T) {
 			requestContentType: "application/json",
 			mockExpect:         true,
 			want: want{
-				code:        201,
+				code:        http.StatusCreated,
 				contentType: "application/json",
 				errMessage:  "",
 			},
@@ -328,7 +374,7 @@ func TestCreateJSONShortURLHandler_ServeHTTP(t *testing.T) {
 			requestContentType: "application/json",
 			mockExpect:         false,
 			want: want{
-				code:        400,
+				code:        http.StatusBadRequest,
 				contentType: "application/json",
 				errMessage:  "Please provide an url\n",
 			},
@@ -339,7 +385,7 @@ func TestCreateJSONShortURLHandler_ServeHTTP(t *testing.T) {
 			requestContentType: "application/json",
 			mockExpect:         false,
 			want: want{
-				code:        400,
+				code:        http.StatusBadRequest,
 				contentType: "application/json",
 				errMessage:  "The provided payload is not a valid URL\n",
 			},
@@ -506,7 +552,7 @@ func TestBatchCreateShortURLHandler_ServeHTTP(t *testing.T) {
 			requestContentType: "application/json",
 			mockExpect:         true,
 			want: want{
-				code:        201,
+				code:        http.StatusCreated,
 				contentType: "application/json",
 				payload: []models.ShortenBatchItemResponse{
 					{CorrelationID: "lelele", ShortURL: "http://localhost:8080/LELELELE"},
@@ -521,7 +567,7 @@ func TestBatchCreateShortURLHandler_ServeHTTP(t *testing.T) {
 			requestContentType: "application/json",
 			mockExpect:         true,
 			want: want{
-				code:        201,
+				code:        http.StatusCreated,
 				contentType: "application/json",
 				payload: []models.ShortenBatchItemResponse{
 					{CorrelationID: "lelele", ShortURL: "http://localhost:8080/LELELELE"},
@@ -535,7 +581,7 @@ func TestBatchCreateShortURLHandler_ServeHTTP(t *testing.T) {
 			requestContentType: "application/json",
 			mockExpect:         false,
 			want: want{
-				code:        400,
+				code:        http.StatusBadRequest,
 				contentType: "application/json",
 				payload:     nil,
 				errMessage:  "Please provide a batch of URLs\n",
@@ -550,7 +596,7 @@ func TestBatchCreateShortURLHandler_ServeHTTP(t *testing.T) {
 			requestContentType: "application/json",
 			mockExpect:         false,
 			want: want{
-				code:        400,
+				code:        http.StatusBadRequest,
 				contentType: "application/json",
 				payload:     nil,
 				errMessage:  "One of the provided items is not a valid URL\n",

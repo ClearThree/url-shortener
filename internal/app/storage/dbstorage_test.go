@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/clearthree/url-shortener/internal/app/models"
+	"github.com/jackc/pgerrcode"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"testing"
@@ -49,6 +51,72 @@ func TestDBRepo_Create(t *testing.T) {
 			got, err := D.Create(tt.args.ctx, tt.args.id, tt.args.originalURL)
 			if !tt.wantErr(t, err, fmt.Sprintf("Create(%v, %v, %v)", tt.args.ctx, tt.args.id, tt.args.originalURL)) {
 				return
+			}
+			assert.Equalf(t, tt.want, got, "Create(%v, %v, %v)", tt.args.ctx, tt.args.id, tt.args.originalURL)
+		})
+	}
+}
+
+func TestDBRepo_CreateAlreadyExists(t *testing.T) {
+	type args struct {
+		ctx         context.Context
+		id          string
+		originalURL string
+		errorCode   string
+	}
+	tests := []struct {
+		name              string
+		args              args
+		want              string
+		wantErr           assert.ErrorAssertionFunc
+		shouldBeCustomErr bool
+	}{
+		{
+			name: "UniqueViolation, return err with existing id",
+			args: args{
+				ctx:         context.Background(),
+				id:          "lelelele",
+				originalURL: "http://ya.ru",
+				errorCode:   pgerrcode.UniqueViolation,
+			},
+			want:              "lelelele",
+			wantErr:           assert.Error,
+			shouldBeCustomErr: true,
+		},
+		{
+			name: "Some other error, return err without existing id",
+			args: args{
+				ctx:         context.Background(),
+				id:          "lelelele",
+				originalURL: "http://ya.ru",
+				errorCode:   pgerrcode.DatabaseDropped,
+			},
+			want:              "",
+			wantErr:           assert.Error,
+			shouldBeCustomErr: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			db, mock, err := sqlmock.New()
+			require.NoError(t, err)
+
+			D := DBRepo{
+				pool: db,
+			}
+			mock.ExpectPrepare("INSERT INTO short_url").ExpectExec().
+				WithArgs(tt.args.id, tt.args.originalURL).
+				WillReturnError(&pgconn.PgError{Code: tt.args.errorCode})
+			mock.ExpectPrepare("SELECT short_url FROM short_url").ExpectQuery().
+				WithArgs(tt.args.originalURL).
+				WillReturnRows(mock.NewRows([]string{"short_url"}).AddRow(tt.want))
+
+			got, err := D.Create(tt.args.ctx, tt.args.id, tt.args.originalURL)
+			if !tt.wantErr(t, err, fmt.Sprintf("Create(%v, %v, %v)", tt.args.ctx, tt.args.id, tt.args.originalURL)) {
+				return
+			}
+			if tt.shouldBeCustomErr {
+				assert.ErrorIs(t, err, ErrAlreadyExists)
 			}
 			assert.Equalf(t, tt.want, got, "Create(%v, %v, %v)", tt.args.ctx, tt.args.id, tt.args.originalURL)
 		})
@@ -228,6 +296,50 @@ func TestDBRepo_BatchCreate(t *testing.T) {
 				return
 			}
 			assert.ElementsMatchf(t, tt.want, got, "BatchCreate(%v, %v)", tt.args.ctx, tt.args.URLs)
+		})
+	}
+}
+
+func TestDBRepo_GetShortURLByOriginalURL(t *testing.T) {
+	type args struct {
+		ctx         context.Context
+		originalURL string
+	}
+	tests := []struct {
+		name string
+		args args
+		want string
+	}{
+		{
+			name: "success",
+			args: args{
+				ctx:         context.Background(),
+				originalURL: "https://ya.ru",
+			},
+			want: "lelelele",
+		},
+		{
+			name: "not found",
+			args: args{
+				ctx:         context.Background(),
+				originalURL: "https://google.com",
+			},
+			want: "",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			db, mock, err := sqlmock.New()
+			require.NoError(t, err)
+			D := DBRepo{
+				pool: db,
+			}
+			mock.ExpectPrepare("SELECT short_url FROM short_url").ExpectQuery().
+				WithArgs(tt.args.originalURL).
+				WillReturnRows(mock.NewRows([]string{"short_url"}).AddRow(tt.want))
+			res, err := D.GetShortURLByOriginalURL(tt.args.ctx, tt.args.originalURL)
+			assert.Equalf(t, tt.want, res, "GetShortURLByOriginalURL(%v, %v)", tt.args.ctx, tt.args.originalURL)
+			require.NoError(t, err)
 		})
 	}
 }

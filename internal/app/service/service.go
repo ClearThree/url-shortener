@@ -47,12 +47,14 @@ func (s *ShortURLService) Create(ctx context.Context, originalURL string) (strin
 	}
 	shortURL, err := s.repo.Create(ctx, id, originalURL)
 	if err != nil {
-		return "", err
+		if !errors.Is(err, storage.ErrAlreadyExists) {
+			return "", err
+		}
 	}
 	result := config.Settings.HostedOn + shortURL
-	_, err = storage.FSWrapper.Create(id, originalURL)
-	if err != nil {
-		return "", err
+	_, fsWrapperErr := storage.FSWrapper.Create(id, originalURL)
+	if fsWrapperErr != nil {
+		return "", fsWrapperErr
 	}
 	return result, err
 }
