@@ -1,8 +1,14 @@
 package service
 
 import (
+	"context"
+	"errors"
+	"fmt"
 	"github.com/clearthree/url-shortener/internal/app/config"
+	"github.com/clearthree/url-shortener/internal/app/mocks"
+	"github.com/clearthree/url-shortener/internal/app/models"
 	"github.com/clearthree/url-shortener/internal/app/storage"
+	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
 
 	"testing"
@@ -12,15 +18,15 @@ type RepoMock struct {
 	localStorage map[string]string
 }
 
-func (rm RepoMock) Create(id string, originalURL string) string {
+func (rm RepoMock) Create(_ context.Context, id string, originalURL string) (string, error) {
 	if rm.localStorage == nil {
 		rm.localStorage = make(map[string]string)
 	}
 	rm.localStorage[id] = originalURL
-	return id
+	return id, nil
 }
 
-func (rm RepoMock) Read(id string) string {
+func (rm RepoMock) Read(_ context.Context, id string) string {
 	if rm.localStorage == nil {
 		rm.localStorage = make(map[string]string)
 	}
@@ -29,6 +35,22 @@ func (rm RepoMock) Read(id string) string {
 		return ""
 	}
 	return originalURL
+}
+
+func (rm RepoMock) Ping(_ context.Context) error {
+	return nil
+}
+
+func (rm RepoMock) BatchCreate(ctx context.Context, URLs map[string]models.ShortenBatchItemRequest) ([]models.ShortenBatchItemResponse, error) {
+	results := make([]models.ShortenBatchItemResponse, 0, len(URLs))
+	for shortURL, data := range URLs {
+		result, err := rm.Create(ctx, shortURL, data.OriginalURL)
+		if err != nil {
+			return nil, err
+		}
+		results = append(results, models.ShortenBatchItemResponse{CorrelationID: data.CorrelationID, ShortURL: result})
+	}
+	return results, nil
 }
 
 func TestNewService(t *testing.T) {
@@ -58,6 +80,7 @@ func TestShortURLService_Create(t *testing.T) {
 		repo storage.Repository
 	}
 	type args struct {
+		ctx         context.Context
 		originalURL string
 	}
 	tests := []struct {
@@ -76,6 +99,7 @@ func TestShortURLService_Create(t *testing.T) {
 			name:   "Successful creation of short url with long original URL",
 			fields: fields{repo: RepoMock{make(map[string]string)}},
 			args: args{
+				ctx:         context.Background(),
 				originalURL: "https://example.com/veeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeerylong",
 			},
 			wantErr: false,
@@ -86,7 +110,7 @@ func TestShortURLService_Create(t *testing.T) {
 			s := &ShortURLService{
 				repo: tt.fields.repo,
 			}
-			got, err := s.Create(tt.args.originalURL)
+			got, err := s.Create(tt.args.ctx, tt.args.originalURL)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Create() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -98,12 +122,69 @@ func TestShortURLService_Create(t *testing.T) {
 	}
 }
 
+func TestShortURLService_CreateWithError(t *testing.T) {
+	type args struct {
+		ctx         context.Context
+		originalURL string
+	}
+	tests := []struct {
+		name           string
+		args           args
+		mockReturns    string
+		mockReturnsErr error
+		want           string
+		wantErr        bool
+	}{
+		{
+			name:           "Creation of short URL with already existing originalURL",
+			args:           args{ctx: context.Background(), originalURL: "https://ya.ru"},
+			mockReturns:    "lelelele",
+			mockReturnsErr: storage.ErrAlreadyExists,
+			want:           "http://localhost:8080/lelelele",
+			wantErr:        true,
+		},
+		{
+			name:           "Creation of short URL with some other error",
+			args:           args{ctx: context.Background(), originalURL: "https://ya.ru"},
+			mockReturns:    "",
+			mockReturnsErr: errors.New("some error"),
+			want:           "",
+			wantErr:        true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			defer ctrl.Finish()
+
+			repoMock := mocks.NewMockRepository(ctrl)
+			s := &ShortURLService{
+				repo: repoMock,
+			}
+			repoMock.EXPECT().
+				Read(tt.args.ctx, gomock.Any()).
+				Return("")
+			repoMock.EXPECT().
+				Create(tt.args.ctx, gomock.Any(), tt.args.originalURL).
+				Return(tt.mockReturns, tt.mockReturnsErr)
+			got, err := s.Create(tt.args.ctx, tt.args.originalURL)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("Create() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			assert.ErrorIs(t, err, tt.mockReturnsErr)
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
 func TestShortURLService_Read(t *testing.T) {
 	type fields struct {
 		repo storage.Repository
 	}
 	type args struct {
-		id string
+		ctx context.Context
+		id  string
 	}
 	tests := []struct {
 		name    string
@@ -132,7 +213,7 @@ func TestShortURLService_Read(t *testing.T) {
 			s := &ShortURLService{
 				repo: tt.fields.repo,
 			}
-			got, err := s.Read(tt.args.id)
+			got, err := s.Read(tt.args.ctx, tt.args.id)
 			if tt.wantErr != nil {
 				assert.ErrorIs(t, err, tt.wantErr)
 			}
@@ -146,6 +227,7 @@ func TestShortURLService_FillRow(t *testing.T) {
 		repo storage.Repository
 	}
 	type args struct {
+		ctx         context.Context
 		shortURL    string
 		originalURL string
 	}
@@ -158,13 +240,14 @@ func TestShortURLService_FillRow(t *testing.T) {
 		{
 			name:    "Successful filling of short URL",
 			fields:  fields{repo: RepoMock{make(map[string]string)}},
-			args:    args{originalURL: "https://ya.ru"},
+			args:    args{ctx: context.Background(), originalURL: "https://ya.ru"},
 			wantErr: false,
 		},
 		{
 			name:   "Successful filling of short url with long original URL",
 			fields: fields{repo: RepoMock{make(map[string]string)}},
 			args: args{
+				ctx:         context.Background(),
 				originalURL: "https://example.com/veeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeerylong",
 			},
 			wantErr: false,
@@ -175,12 +258,12 @@ func TestShortURLService_FillRow(t *testing.T) {
 			s := &ShortURLService{
 				repo: tt.fields.repo,
 			}
-			err := s.FillRow(tt.args.originalURL, tt.args.shortURL)
+			err := s.FillRow(tt.args.ctx, tt.args.originalURL, tt.args.shortURL)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Create() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			assert.Equal(t, tt.fields.repo.Read(tt.args.shortURL), tt.args.originalURL)
+			assert.Equal(t, tt.fields.repo.Read(tt.args.ctx, tt.args.shortURL), tt.args.originalURL)
 		})
 	}
 }
@@ -200,6 +283,74 @@ func Test_generateID(t *testing.T) {
 			got := generateID()
 			assert.Equal(t, tt.wantLength, len(got))
 
+		})
+	}
+}
+
+func TestShortURLService_BatchCreate(t *testing.T) {
+	type args struct {
+		ctx         context.Context
+		requestData []models.ShortenBatchItemRequest
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    []models.ShortenBatchItemResponse
+		wantErr assert.ErrorAssertionFunc
+	}{
+		{
+			name: "Successful batch creation",
+			args: args{
+				ctx: context.Background(),
+				requestData: []models.ShortenBatchItemRequest{
+					{CorrelationID: "lele", OriginalURL: "https://ya.ru"},
+					{CorrelationID: "lolo", OriginalURL: "https://yandex.ru"},
+				},
+			},
+			want: []models.ShortenBatchItemResponse{
+				{CorrelationID: "lele", ShortURL: config.Settings.HostedOn + "lelele"},
+				{CorrelationID: "lolo", ShortURL: config.Settings.HostedOn + "lelele"},
+			},
+			wantErr: assert.NoError,
+		},
+		{
+			name: "Successful batch creation for single URL",
+			args: args{
+				ctx: context.Background(),
+				requestData: []models.ShortenBatchItemRequest{
+					{CorrelationID: "lele", OriginalURL: "https://ya.ru"},
+				},
+			},
+			want: []models.ShortenBatchItemResponse{
+				{CorrelationID: "lele", ShortURL: config.Settings.HostedOn + "lelele"},
+			},
+			wantErr: assert.NoError,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			defer ctrl.Finish()
+
+			repoMock := mocks.NewMockRepository(ctrl)
+			s := &ShortURLService{
+				repo: repoMock,
+			}
+			var returnStruct []models.ShortenBatchItemResponse
+			for _, requestItem := range tt.args.requestData {
+				returnStruct = append(returnStruct, models.ShortenBatchItemResponse{
+					CorrelationID: requestItem.CorrelationID,
+					ShortURL:      "lelele",
+				})
+			}
+			repoMock.EXPECT().
+				BatchCreate(tt.args.ctx, gomock.Any()).
+				Return(returnStruct, nil)
+			got, err := s.BatchCreate(tt.args.ctx, tt.args.requestData)
+			if !tt.wantErr(t, err, fmt.Sprintf("BatchCreate(%v, %v)", tt.args.ctx, tt.args.requestData)) {
+				return
+			}
+			assert.Equalf(t, tt.want, got, "BatchCreate(%v, %v)", tt.args.ctx, tt.args.requestData)
 		})
 	}
 }

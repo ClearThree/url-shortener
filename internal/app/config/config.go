@@ -14,6 +14,7 @@ type Config struct {
 	HostedOn        string `env:"BASE_URL"`
 	LogLevel        string `env:"LOG_LEVEL" envDefault:"INFO"`
 	FileStoragePath string `env:"FILE_STORAGE_PATH"`
+	DatabaseDSN     string `env:"DATABASE_DSN"`
 }
 
 func (cfg *Config) Sanitize() {
@@ -29,6 +30,7 @@ func NewConfigFromArgs(argsConfig ArgsConfig) Config {
 		Address:         argsConfig.Address.String(),
 		HostedOn:        argsConfig.HostedOn.String(),
 		FileStoragePath: argsConfig.FileStoragePath.String(),
+		DatabaseDSN:     argsConfig.DatabaseDSN.String(),
 	}
 }
 
@@ -36,6 +38,7 @@ type ArgsConfig struct {
 	Address         NetAddress
 	HostedOn        HTTPAddress
 	FileStoragePath FileStoragePath
+	DatabaseDSN     DatabaseDSN
 }
 
 var argsConfig ArgsConfig
@@ -107,11 +110,26 @@ func (f *FileStoragePath) String() string {
 	return f.Path
 }
 
-func (f *FileStoragePath) Set(s string) error {
-	if s == "" {
+func (f *FileStoragePath) Set(flagValue string) error {
+	if flagValue == "" {
 		return errors.New("file storage path must not be empty")
 	}
-	f.Path = s
+	f.Path = flagValue
+	return nil
+}
+
+type DatabaseDSN struct {
+	DSN string
+}
+
+func (d *DatabaseDSN) String() string {
+	return d.DSN
+}
+func (d *DatabaseDSN) Set(flagValue string) error {
+	if flagValue == "" {
+		return errors.New("database DSN must not be empty")
+	}
+	d.DSN = flagValue
 	return nil
 }
 
@@ -119,9 +137,11 @@ func ParseFlags() {
 	hostAddr := new(NetAddress)
 	baseAddr := new(HTTPAddress)
 	fileStoragePath := new(FileStoragePath)
+	databaseDSN := new(DatabaseDSN)
 	flag.Var(hostAddr, "a", "Address to host on host:port")
 	flag.Var(baseAddr, "b", "base URL for resulting short URL (scheme://host:port)")
 	flag.Var(fileStoragePath, "f", "path to file to store short URLs")
+	flag.Var(databaseDSN, "d", "DSN to connect to the database")
 	flag.Parse()
 	if hostAddr.Host == "" && hostAddr.Port == 0 {
 		hostAddr.Host = "localhost"
@@ -135,9 +155,11 @@ func ParseFlags() {
 	if fileStoragePath.Path == "" {
 		fileStoragePath.Path = "./internal/app/storage/storage.json"
 	}
+
 	argsConfig.Address = *hostAddr
 	argsConfig.HostedOn = *baseAddr
 	argsConfig.FileStoragePath = *fileStoragePath
+	argsConfig.DatabaseDSN = *databaseDSN
 	Settings = NewConfigFromArgs(argsConfig)
 }
 
@@ -146,4 +168,5 @@ func init() {
 	Settings.HostedOn = "http://localhost:8080/"
 	Settings.LogLevel = "INFO"
 	Settings.FileStoragePath = "./storage.json"
+	Settings.DatabaseDSN = ""
 }

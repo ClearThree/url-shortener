@@ -1,0 +1,19 @@
+services:
+  shortURL-postgres:
+    container_name: shortURL-postgres
+    image: postgres:15
+    environment:
+      POSTGRES_USER: "clearthree"
+      POSTGRES_PASSWORD: "postgres"
+      POSTGRES_DB: "shortURL"
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready --username=${PG_USER:-clearthree} --dbname=${PG_DB:-shortURL}",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    ports:
+      - "5432:5432"

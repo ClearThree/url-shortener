@@ -1,8 +1,10 @@
 package service
 
 import (
+	"context"
 	"errors"
 	"github.com/clearthree/url-shortener/internal/app/config"
+	"github.com/clearthree/url-shortener/internal/app/models"
 	"github.com/clearthree/url-shortener/internal/app/storage"
 	"math/rand"
 )
@@ -20,9 +22,11 @@ func generateID() string {
 	return string(bytesSlice)
 }
 
-type Interface interface {
-	Create(repo storage.Repository, originalURL string) (string, error)
-	Read(repo storage.Repository, id string) (string, error)
+type ShortURLServiceInterface interface {
+	Create(ctx context.Context, originalURL string) (string, error)
+	Read(ctx context.Context, id string) (string, error)
+	Ping(ctx context.Context) error
+	BatchCreate(ctx context.Context, requestData []models.ShortenBatchItemRequest) ([]models.ShortenBatchItemResponse, error)
 }
 type ShortURLService struct {
 	repo storage.Repository
@@ -32,31 +36,64 @@ func NewService(repo storage.Repository) ShortURLService {
 	return ShortURLService{repo: repo}
 }
 
-func (s *ShortURLService) Create(originalURL string) (string, error) {
+func (s *ShortURLService) Create(ctx context.Context, originalURL string) (string, error) {
 	var id string
 	for {
 		id = generateID()
-		existingURLByID := s.repo.Read(id)
+		existingURLByID := s.repo.Read(ctx, id)
 		if existingURLByID == "" {
 			break
 		}
 	}
-	result := config.Settings.HostedOn + s.repo.Create(id, originalURL)
-	_, err := storage.FSWrapper.Create(id, originalURL)
+	shortURL, err := s.repo.Create(ctx, id, originalURL)
+	if err != nil {
+		if !errors.Is(err, storage.ErrAlreadyExists) {
+			return "", err
+		}
+	}
+	result := config.Settings.HostedOn + shortURL
+	_, fsWrapperErr := storage.FSWrapper.Create(id, originalURL)
+	if fsWrapperErr != nil {
+		return "", fsWrapperErr
+	}
 	return result, err
 }
 
-func (s *ShortURLService) Read(id string) (string, error) {
-	originalURL := s.repo.Read(id)
+func (s *ShortURLService) Read(ctx context.Context, id string) (string, error) {
+	originalURL := s.repo.Read(ctx, id)
 	if originalURL == "" {
 		return originalURL, ErrShortURLNotFound
 	}
 	return originalURL, nil
 }
 
-func (s *ShortURLService) FillRow(originalURL string, shortURL string) error {
-	s.repo.Create(shortURL, originalURL)
-	return nil
+func (s *ShortURLService) FillRow(ctx context.Context, originalURL string, shortURL string) error {
+	_, err := s.repo.Create(ctx, shortURL, originalURL)
+	return err
 }
 
-var ShortURLServiceInstance = NewService(storage.MemoryRepo{})
+func (s *ShortURLService) Ping(ctx context.Context) error {
+	return s.repo.Ping(ctx)
+}
+
+func (s *ShortURLService) BatchCreate(
+	ctx context.Context, requestData []models.ShortenBatchItemRequest) ([]models.ShortenBatchItemResponse, error) {
+	URLs := make(map[string]models.ShortenBatchItemRequest)
+	for _, item := range requestData {
+		shortURL := generateID()
+		URLs[shortURL] = item
+	}
+	result, err := s.repo.BatchCreate(ctx, URLs)
+	if err != nil {
+		return nil, err
+	}
+	for i := 0; i < len(result); i++ {
+		data := &result[i]
+		data.ShortURL = config.Settings.HostedOn + data.ShortURL
+	}
+	_, err = storage.FSWrapper.BatchCreate(URLs)
+	if err != nil {
+		return nil, err
+	}
+	return result, nil
+}

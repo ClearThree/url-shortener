@@ -33,7 +33,7 @@ func testRequest(t *testing.T, testServer *httptest.Server, method string, path 
 }
 
 func TestRouter(t *testing.T) {
-	testServer := httptest.NewServer(ShortenURLRouter())
+	testServer := httptest.NewServer(ShortenURLRouter(nil))
 	defer testServer.Close()
 
 	var tests = []struct {
@@ -99,6 +99,24 @@ func TestRouter(t *testing.T) {
 			status:      http.StatusMethodNotAllowed,
 			preCreate:   false,
 		},
+		{
+			URL:         "/api/shorten/batch",
+			method:      http.MethodPost,
+			payload:     `[{"original_url": "https://ya.ru", "correlation_id": "lelele"}]`,
+			contentType: "application/json",
+			want:        `"correlation_id":"lelele"`,
+			status:      http.StatusCreated,
+			preCreate:   false,
+		},
+		{
+			URL:         "/api/shorten/batch",
+			method:      http.MethodPut,
+			payload:     `[{"original_url": "https://ya.ru", "correlation_id": "lelele"}, {"original_url": "https://yandex.ru", "correlation_id": "lololo"}]`,
+			contentType: "application/json",
+			want:        "",
+			status:      http.StatusMethodNotAllowed,
+			preCreate:   false,
+		},
 	}
 	for _, test := range tests {
 		var URL = test.URL
@@ -115,7 +133,7 @@ func TestRouter(t *testing.T) {
 }
 
 func TestCompression(t *testing.T) {
-	testServer := httptest.NewServer(ShortenURLRouter())
+	testServer := httptest.NewServer(ShortenURLRouter(nil))
 	defer testServer.Close()
 	requestBody := `{"url": "https://ya.ru"}`
 
