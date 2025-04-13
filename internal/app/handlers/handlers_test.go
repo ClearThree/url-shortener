@@ -205,7 +205,7 @@ func TestCreateShortURLHandler(t *testing.T) {
 			shortURLServiceMock := mocks.NewMockShortURLServiceInterface(ctrl)
 			if test.mockExpect {
 				shortURLServiceMock.EXPECT().
-					Create(context.Background(), gomock.Any()).
+					Create(context.Background(), gomock.Any(), gomock.Any()).
 					Return(test.mockReturns, test.mockReturnsError)
 			}
 
@@ -398,7 +398,7 @@ func TestCreateJSONShortURLHandler_ServeHTTP(t *testing.T) {
 
 			shortURLServiceMock := mocks.NewMockShortURLServiceInterface(ctrl)
 			if test.mockExpect {
-				shortURLServiceMock.EXPECT().Create(context.Background(), gomock.Any()).Return("http://localhost:8080/lelelele", nil)
+				shortURLServiceMock.EXPECT().Create(context.Background(), gomock.Any(), gomock.Any()).Return("http://localhost:8080/lelelele", nil)
 			}
 			body := strings.NewReader(test.requestPayload)
 			request := httptest.NewRequest(http.MethodPost, "/", body)
@@ -623,7 +623,7 @@ func TestBatchCreateShortURLHandler_ServeHTTP(t *testing.T) {
 					})
 				}
 				shortURLServiceMock.EXPECT().
-					BatchCreate(context.Background(), requestData).
+					BatchCreate(context.Background(), requestData, gomock.Any()).
 					Return(returnStruct, nil)
 			}
 			body := strings.NewReader(test.requestPayload)
@@ -647,6 +647,108 @@ func TestBatchCreateShortURLHandler_ServeHTTP(t *testing.T) {
 			require.NoError(t, err)
 			assert.Equal(t, test.want.payload, responseData)
 			assert.Equal(t, test.want.contentType, res.Header.Get("Content-Type"))
+		})
+	}
+}
+
+func TestNewGetAllURLsForUserHandler(t *testing.T) {
+	type args struct {
+		service service.ShortURLServiceInterface
+	}
+	tests := []struct {
+		name string
+		args args
+		want *GetAllURLsForUserHandler
+	}{
+		{
+			name: "Successful creation of all URLs for user handler",
+			args: args{
+				service: &ServiceForTest,
+			},
+			want: &GetAllURLsForUserHandler{
+				service: &ServiceForTest,
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equalf(t, tt.want, NewGetAllURLsForUserHandler(tt.args.service), "NewGetAllURLsForUserHandler(%v)", tt.args.service)
+		})
+	}
+}
+
+func TestGetAllURLsForUserHandler_ServeHTTP(t *testing.T) {
+	type want struct {
+		code        int
+		contentType string
+		payload     []models.ShortURLsByUserResponse
+	}
+	tests := []struct {
+		name      string
+		want      want
+		mockValue []models.ShortURLsByUserResponse
+	}{
+		{
+			name: "Successful return of all URLs for the user",
+			want: want{
+				code:        http.StatusOK,
+				contentType: "application/json",
+				payload: []models.ShortURLsByUserResponse{
+					{
+						ShortURL:    "http://localhost:8080/lelele",
+						OriginalURL: "http://ya.ru",
+					},
+					{
+						ShortURL:    "http://localhost:8080/lololo",
+						OriginalURL: "http://yandex.ru",
+					},
+				},
+			},
+			mockValue: []models.ShortURLsByUserResponse{
+				{
+					ShortURL:    "http://localhost:8080/lelele",
+					OriginalURL: "http://ya.ru",
+				},
+				{
+					ShortURL:    "http://localhost:8080/lololo",
+					OriginalURL: "http://yandex.ru",
+				},
+			},
+		},
+		{
+			name: "Successful return of empty URLs list",
+			want: want{
+				code:        http.StatusNoContent,
+				contentType: "application/json",
+				payload:     nil,
+			},
+			mockValue: []models.ShortURLsByUserResponse{},
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			defer ctrl.Finish()
+			shortURLServiceMock := mocks.NewMockShortURLServiceInterface(ctrl)
+			shortURLServiceMock.EXPECT().
+				ReadByUserID(context.Background(), gomock.Any()).
+				Return(test.mockValue, nil)
+			request := httptest.NewRequest(http.MethodGet, "/api/user/urls", nil)
+			recorder := httptest.NewRecorder()
+			handler := NewGetAllURLsForUserHandler(shortURLServiceMock)
+			handler.ServeHTTP(recorder, request)
+			res := recorder.Result()
+			assert.Equal(t, test.want.code, res.StatusCode)
+			defer res.Body.Close()
+
+			if test.want.payload != nil {
+				var responseData []models.ShortURLsByUserResponse
+				dec := json.NewDecoder(res.Body)
+				err := dec.Decode(&responseData)
+				require.NoError(t, err)
+				assert.Equal(t, test.want.payload, responseData)
+				assert.Equal(t, test.want.contentType, res.Header.Get("Content-Type"))
+			}
 		})
 	}
 }

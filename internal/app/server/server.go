@@ -33,14 +33,17 @@ func ShortenURLRouter(pool *sql.DB) chi.Router {
 	var shortURLServiceDB = service.NewService(storage.NewDBRepo(pool))
 	var pingHandler = handlers.NewPingHandler(&shortURLServiceDB)
 	var batchCreateHandler = handlers.NewBatchCreateShortURLHandler(&shortURLService)
+	var getAllUrlsByUserHandler = handlers.NewGetAllURLsForUserHandler(&shortURLService)
 
 	router := chi.NewRouter()
 	router.Use(middlewares.RequestLogger)
+	router.Use(middlewares.AuthMiddleware)
 	router.Use(middlewares.GzipMiddleware)
 	router.Use(middleware.Recoverer)
 	router.Post("/", createHandler.ServeHTTP)
 	router.Post("/api/shorten", createJSONShortURLHandler.ServeHTTP)
 	router.Post("/api/shorten/batch", batchCreateHandler.ServeHTTP)
+	router.Get("/api/user/urls", getAllUrlsByUserHandler.ServeHTTP)
 	router.Get("/{id}", redirectHandler.ServeHTTP)
 	router.Get("/ping", pingHandler.ServeHTTP)
 	return router
@@ -91,7 +94,7 @@ func prefillMemory() error {
 			}
 		}
 		shortURLService = service.NewService(storage.MemoryRepo{})
-		fillingError := shortURLService.FillRow(context.Background(), row.OriginalURL, row.ShortURL)
+		fillingError := shortURLService.FillRow(context.Background(), row.OriginalURL, row.ShortURL, row.UserID)
 		if fillingError != nil {
 			return fillingError
 		}

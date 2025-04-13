@@ -36,33 +36,33 @@ func (m *MockShortURLServiceInterface) EXPECT() *MockShortURLServiceInterfaceMoc
 }
 
 // BatchCreate mocks base method.
-func (m *MockShortURLServiceInterface) BatchCreate(arg0 context.Context, arg1 []models.ShortenBatchItemRequest) ([]models.ShortenBatchItemResponse, error) {
+func (m *MockShortURLServiceInterface) BatchCreate(arg0 context.Context, arg1 []models.ShortenBatchItemRequest, arg2 string) ([]models.ShortenBatchItemResponse, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "BatchCreate", arg0, arg1)
+	ret := m.ctrl.Call(m, "BatchCreate", arg0, arg1, arg2)
 	ret0, _ := ret[0].([]models.ShortenBatchItemResponse)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // BatchCreate indicates an expected call of BatchCreate.
-func (mr *MockShortURLServiceInterfaceMockRecorder) BatchCreate(arg0, arg1 interface{}) *gomock.Call {
+func (mr *MockShortURLServiceInterfaceMockRecorder) BatchCreate(arg0, arg1, arg2 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "BatchCreate", reflect.TypeOf((*MockShortURLServiceInterface)(nil).BatchCreate), arg0, arg1)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "BatchCreate", reflect.TypeOf((*MockShortURLServiceInterface)(nil).BatchCreate), arg0, arg1, arg2)
 }
 
 // Create mocks base method.
-func (m *MockShortURLServiceInterface) Create(arg0 context.Context, arg1 string) (string, error) {
+func (m *MockShortURLServiceInterface) Create(arg0 context.Context, arg1, arg2 string) (string, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Create", arg0, arg1)
+	ret := m.ctrl.Call(m, "Create", arg0, arg1, arg2)
 	ret0, _ := ret[0].(string)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // Create indicates an expected call of Create.
-func (mr *MockShortURLServiceInterfaceMockRecorder) Create(arg0, arg1 interface{}) *gomock.Call {
+func (mr *MockShortURLServiceInterfaceMockRecorder) Create(arg0, arg1, arg2 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Create", reflect.TypeOf((*MockShortURLServiceInterface)(nil).Create), arg0, arg1)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Create", reflect.TypeOf((*MockShortURLServiceInterface)(nil).Create), arg0, arg1, arg2)
 }
 
 // Ping mocks base method.
@@ -92,4 +92,19 @@ func (m *MockShortURLServiceInterface) Read(arg0 context.Context, arg1 string) (
 func (mr *MockShortURLServiceInterfaceMockRecorder) Read(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Read", reflect.TypeOf((*MockShortURLServiceInterface)(nil).Read), arg0, arg1)
+}
+
+// ReadByUserID mocks base method.
+func (m *MockShortURLServiceInterface) ReadByUserID(arg0 context.Context, arg1 string) ([]models.ShortURLsByUserResponse, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ReadByUserID", arg0, arg1)
+	ret0, _ := ret[0].([]models.ShortURLsByUserResponse)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ReadByUserID indicates an expected call of ReadByUserID.
+func (mr *MockShortURLServiceInterfaceMockRecorder) ReadByUserID(arg0, arg1 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ReadByUserID", reflect.TypeOf((*MockShortURLServiceInterface)(nil).ReadByUserID), arg0, arg1)
 }

@@ -59,6 +59,7 @@ func TestFileWrapper_Create(t *testing.T) {
 	type args struct {
 		id          string
 		originalURL string
+		userID      string
 	}
 	tests := []struct {
 		name   string
@@ -77,6 +78,7 @@ func TestFileWrapper_Create(t *testing.T) {
 			args: args{
 				id:          "lelele",
 				originalURL: "http://localhost/1",
+				userID:      "SomeUserID",
 			},
 			want: 1,
 		},
@@ -91,6 +93,7 @@ func TestFileWrapper_Create(t *testing.T) {
 			args: args{
 				id:          "lelele",
 				originalURL: "http://localhost/1",
+				userID:      "SomeUserID",
 			},
 			want: 6,
 		},
@@ -103,7 +106,7 @@ func TestFileWrapper_Create(t *testing.T) {
 				writer:   tt.fields.writer,
 				lastUUID: tt.fields.lastUUID,
 			}
-			got, err := f.Create(tt.args.id, tt.args.originalURL)
+			got, err := f.Create(tt.args.id, tt.args.originalURL, tt.args.userID)
 			require.NoError(t, err)
 			assert.Equalf(t, tt.want, got, "Create(%v, %v)", tt.args.id, tt.args.originalURL)
 		})
@@ -264,7 +267,8 @@ func TestFileWrapper_BatchCreate(t *testing.T) {
 		lastUUID int32
 	}
 	type args struct {
-		URLs map[string]models.ShortenBatchItemRequest
+		URLs   map[string]models.ShortenBatchItemRequest
+		userID string
 	}
 	tests := []struct {
 		name   string
@@ -285,6 +289,7 @@ func TestFileWrapper_BatchCreate(t *testing.T) {
 					"lele": {CorrelationID: "lelele", OriginalURL: "https://ya.ru"},
 					"lolo": {CorrelationID: "lololo", OriginalURL: "https://yandex.ru"},
 				},
+				userID: "SomeUserID",
 			},
 			want: 2,
 		},
@@ -300,6 +305,7 @@ func TestFileWrapper_BatchCreate(t *testing.T) {
 				URLs: map[string]models.ShortenBatchItemRequest{
 					"lele": {CorrelationID: "lelele", OriginalURL: "https://ya.ru"},
 				},
+				userID: "SomeUserID",
 			},
 			want: 6,
 		},
@@ -312,7 +318,7 @@ func TestFileWrapper_BatchCreate(t *testing.T) {
 				writer:   tt.fields.writer,
 				lastUUID: tt.fields.lastUUID,
 			}
-			got, err := f.BatchCreate(tt.args.URLs)
+			got, err := f.BatchCreate(tt.args.URLs, tt.args.userID)
 			require.NoError(t, err)
 			assert.Equalf(t, tt.want, got, "BatchCreate(%v)", tt.args.URLs)
 		})

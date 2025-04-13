@@ -18,25 +18,55 @@ func NewDBRepo(pool *sql.DB) *DBRepo {
 	return &DBRepo{pool}
 }
 
-func (D DBRepo) Create(ctx context.Context, id string, originalURL string) (string, error) {
-	createShortURLPreparedStmt, err := D.pool.PrepareContext(
-		ctx, "INSERT INTO short_url (short_url, original_url) VALUES ($1, $2)")
+func (D DBRepo) Create(ctx context.Context, id string, originalURL string, userID string) (string, error) {
+	transaction, err := D.pool.Begin()
 	if err != nil {
 		return "", err
 	}
-	_, err = createShortURLPreparedStmt.ExecContext(ctx, id, originalURL)
+	createUserPreparedStmt, err := transaction.PrepareContext(
+		ctx, "INSERT INTO users (id) VALUES ($1) ON CONFLICT DO NOTHING")
 	if err != nil {
+		return "", err
+	}
+	_, userErr := createUserPreparedStmt.ExecContext(ctx, userID)
+	if userErr != nil {
+		txErr := transaction.Rollback()
+		if txErr != nil {
+			return "", txErr
+		}
+	}
+
+	createShortURLPreparedStmt, err := transaction.PrepareContext(
+		ctx, "INSERT INTO short_url (short_url, original_url, user_id) VALUES ($1, $2, $3)")
+	if err != nil {
+		return "", err
+	}
+	_, createErr := createShortURLPreparedStmt.ExecContext(ctx, id, originalURL, userID)
+	if createErr != nil {
 		var pgErr *pgconn.PgError
-		if errors.As(err, &pgErr) && pgerrcode.IsIntegrityConstraintViolation(pgErr.Code) {
+		if errors.As(createErr, &pgErr) && pgerrcode.IsIntegrityConstraintViolation(pgErr.Code) {
 			logger.Log.Infof("OriginalURL %s already exists", originalURL)
-			id, innerErr := D.GetShortURLByOriginalURL(ctx, originalURL)
+			existingID, innerErr := D.GetShortURLByOriginalURL(ctx, originalURL)
 			if innerErr != nil {
+				txErr := transaction.Rollback()
+				if txErr != nil {
+					return "", txErr
+				}
 				return "", innerErr
 			}
-			err = NewErrAlreadyExists(ErrAlreadyExists, id)
-			return id, err
+			err = NewErrAlreadyExists(ErrAlreadyExists, existingID)
+			transaction.Rollback()
+			return existingID, err
+		}
+		txErr := transaction.Rollback()
+		if txErr != nil {
+			return "", txErr
 		}
 		return "", err
+	}
+	txErr := transaction.Commit()
+	if txErr != nil {
+		return "", txErr
 	}
 	return id, nil
 }
@@ -74,11 +104,24 @@ func (D DBRepo) Ping(ctx context.Context) error {
 	return D.pool.PingContext(ctx)
 }
 
-func (D DBRepo) BatchCreate(ctx context.Context, URLs map[string]models.ShortenBatchItemRequest) ([]models.ShortenBatchItemResponse, error) {
+func (D DBRepo) BatchCreate(ctx context.Context, URLs map[string]models.ShortenBatchItemRequest, userID string) ([]models.ShortenBatchItemResponse, error) {
 	transaction, err := D.pool.Begin()
 	if err != nil {
 		return nil, err
 	}
+	createUserPreparedStmt, err := transaction.PrepareContext(
+		ctx, "INSERT INTO users (id) VALUES ($1)")
+	if err != nil {
+		return nil, err
+	}
+	_, userErr := createUserPreparedStmt.ExecContext(ctx, userID)
+	if userErr != nil {
+		var pgErr *pgconn.PgError
+		if errors.As(userErr, &pgErr) && pgerrcode.IsIntegrityConstraintViolation(pgErr.Code) {
+			logger.Log.Infof("UserID %s already exists", userID)
+		}
+	}
+
 	createShortURLPreparedStmt, err := transaction.PrepareContext(
 		ctx, "INSERT INTO short_url (short_url, original_url, correlation_id) VALUES ($1, $2, $3)")
 	if err != nil {
@@ -99,6 +142,32 @@ func (D DBRepo) BatchCreate(ctx context.Context, URLs map[string]models.ShortenB
 	txErr := transaction.Commit()
 	if txErr != nil {
 		logger.Log.Error(txErr.Error())
+	}
+	return results, nil
+}
+
+func (D DBRepo) ReadByUserID(ctx context.Context, userID string) ([]models.ShortURLsByUserResponse, error) {
+	readURLsByUserIDPreparedStmt, err := D.pool.PrepareContext(
+		ctx, "SELECT short_url, original_url FROM short_url WHERE user_id = $1")
+	if err != nil {
+		return nil, err
+	}
+	rows, err := readURLsByUserIDPreparedStmt.QueryContext(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	if rows.Err() != nil {
+		return nil, rows.Err()
+	}
+	results := make([]models.ShortURLsByUserResponse, 0)
+	for rows.Next() {
+		URL := new(models.ShortURLsByUserResponse)
+		scanErr := rows.Scan(&URL.ShortURL, &URL.OriginalURL)
+		if scanErr != nil {
+			logger.Log.Error(scanErr.Error())
+			return nil, scanErr
+		}
+		results = append(results, *URL)
 	}
 	return results, nil
 }

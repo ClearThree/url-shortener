@@ -15,6 +15,8 @@ type Config struct {
 	LogLevel        string `env:"LOG_LEVEL" envDefault:"INFO"`
 	FileStoragePath string `env:"FILE_STORAGE_PATH"`
 	DatabaseDSN     string `env:"DATABASE_DSN"`
+	SecretKey       string `env:"SECRET_KEY" envDefault:"DontUseThatInProduction"`
+	JWTExpireHours  int64  `env:"JWT_EXPIRE_HOURS" envDefault:"96"`
 }
 
 func (cfg *Config) Sanitize() {
@@ -169,4 +171,5 @@ func init() {
 	Settings.LogLevel = "INFO"
 	Settings.FileStoragePath = "./storage.json"
 	Settings.DatabaseDSN = ""
+	Settings.SecretKey = "DontUseThatInProduction" // Ожидается, что настоящий ключ будет передан через env
 }

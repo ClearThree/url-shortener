@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"github.com/clearthree/url-shortener/internal/app/logger"
+	"github.com/clearthree/url-shortener/internal/app/middlewares"
 	"github.com/clearthree/url-shortener/internal/app/models"
 	"github.com/clearthree/url-shortener/internal/app/storage"
 	"io"
@@ -63,7 +64,8 @@ func (create CreateShortURLHandler) ServeHTTP(writer http.ResponseWriter, reques
 		http.Error(writer, "The provided payload is not a valid URL", http.StatusBadRequest)
 		return
 	}
-	id, err := create.service.Create(request.Context(), payloadString)
+	userID := request.Header.Get(middlewares.UserIDHeaderName)
+	id, err := create.service.Create(request.Context(), payloadString, userID)
 	if err != nil {
 		if errors.Is(err, storage.ErrAlreadyExists) {
 			create.writeResponse(writer, http.StatusConflict, id)
@@ -141,7 +143,8 @@ func (create CreateJSONShortURLHandler) ServeHTTP(writer http.ResponseWriter, re
 		http.Error(writer, "The provided payload is not a valid URL", http.StatusBadRequest)
 		return
 	}
-	id, err := create.service.Create(request.Context(), requestData.URL)
+	userID := request.Header.Get(middlewares.UserIDHeaderName)
+	id, err := create.service.Create(request.Context(), requestData.URL, userID)
 	if err != nil {
 		if errors.Is(err, storage.ErrAlreadyExists) {
 			create.writeResponse(writer, http.StatusConflict, id)
@@ -212,13 +215,43 @@ func (create BatchCreateShortURLHandler) ServeHTTP(writer http.ResponseWriter, r
 			return
 		}
 	}
-	results, err := create.service.BatchCreate(request.Context(), requestData)
+	userID := request.Header.Get(middlewares.UserIDHeaderName)
+	results, err := create.service.BatchCreate(request.Context(), requestData, userID)
 	if err != nil {
 		http.Error(writer, "Couldn't create short url", http.StatusBadRequest)
 		return
 	}
 	writer.Header().Add("Content-Type", "application/json")
 	writer.WriteHeader(http.StatusCreated)
+	enc := json.NewEncoder(writer)
+	if err = enc.Encode(results); err != nil {
+		logger.Log.Debugf("Error encoding response: %s", err)
+		return
+	}
+}
+
+type GetAllURLsForUserHandler struct {
+	service service.ShortURLServiceInterface
+}
+
+func NewGetAllURLsForUserHandler(service service.ShortURLServiceInterface) *GetAllURLsForUserHandler {
+	return &GetAllURLsForUserHandler{service: service}
+}
+
+func (getHandler GetAllURLsForUserHandler) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
+	defer request.Body.Close()
+	userID := request.Header.Get(middlewares.UserIDHeaderName)
+	results, err := getHandler.service.ReadByUserID(request.Context(), userID)
+	if err != nil {
+		http.Error(writer, "Couldn't read all the urls for user", http.StatusBadRequest)
+		return
+	}
+	if len(results) == 0 {
+		writer.WriteHeader(http.StatusNoContent)
+		return
+	}
+	writer.Header().Add("Content-Type", "application/json")
+	writer.WriteHeader(http.StatusOK)
 	enc := json.NewEncoder(writer)
 	if err = enc.Encode(results); err != nil {
 		logger.Log.Debugf("Error encoding response: %s", err)

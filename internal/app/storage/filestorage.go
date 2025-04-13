@@ -17,6 +17,7 @@ type FileRow struct {
 	UUID        int32  `json:"uuid"`
 	ShortURL    string `json:"short_url"`
 	OriginalURL string `json:"original_url"`
+	UserID      string `json:"user_id"`
 }
 
 type FileWrapper struct {
@@ -56,7 +57,7 @@ func (f *FileWrapper) Close() error {
 	return fileCloseErr
 }
 
-func (f *FileWrapper) Create(id string, originalURL string) (int32, error) {
+func (f *FileWrapper) Create(id string, originalURL string, userID string) (int32, error) {
 	if f.file == nil {
 		err := f.Open()
 		if err != nil {
@@ -67,6 +68,7 @@ func (f *FileWrapper) Create(id string, originalURL string) (int32, error) {
 		UUID:        f.lastUUID + 1,
 		ShortURL:    id,
 		OriginalURL: originalURL,
+		UserID:      userID,
 	}
 	data, err := json.Marshal(&row)
 	if err != nil {
@@ -85,7 +87,7 @@ func (f *FileWrapper) Create(id string, originalURL string) (int32, error) {
 	return f.lastUUID, nil
 }
 
-func (f *FileWrapper) BatchCreate(URLs map[string]models.ShortenBatchItemRequest) (int32, error) {
+func (f *FileWrapper) BatchCreate(URLs map[string]models.ShortenBatchItemRequest, userID string) (int32, error) {
 	if f.file == nil {
 		err := f.Open()
 		if err != nil {
@@ -97,6 +99,7 @@ func (f *FileWrapper) BatchCreate(URLs map[string]models.ShortenBatchItemRequest
 			UUID:        f.lastUUID + 1,
 			ShortURL:    id,
 			OriginalURL: item.OriginalURL,
+			UserID:      userID,
 		}
 		data, err := json.Marshal(&row)
 		if err != nil {
