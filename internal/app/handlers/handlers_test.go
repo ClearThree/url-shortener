@@ -20,7 +20,7 @@ import (
 	"testing"
 )
 
-var ServiceForTest = service.NewService(storage.MemoryRepo{})
+var ServiceForTest = service.NewService(storage.MemoryRepo{}, make(chan struct{}))
 
 func TestNewCreateShortURLHandler(t *testing.T) {
 	type args struct {
@@ -295,9 +295,9 @@ func TestRedirectToOriginalURLHandler(t *testing.T) {
 			defer ctrl.Finish()
 			shortURLServiceMock := mocks.NewMockShortURLServiceInterface(ctrl)
 			if test.mockValue != "" {
-				shortURLServiceMock.EXPECT().Read(context.Background(), test.mockValue).Return(test.want.response, nil)
+				shortURLServiceMock.EXPECT().Read(context.Background(), test.mockValue).Return(test.want.response, false, nil)
 			} else {
-				shortURLServiceMock.EXPECT().Read(context.Background(), gomock.Any()).Return("", service.ErrShortURLNotFound)
+				shortURLServiceMock.EXPECT().Read(context.Background(), gomock.Any()).Return("", false, service.ErrShortURLNotFound)
 			}
 			recorder := httptest.NewRecorder()
 			request := httptest.NewRequest(test.requestMethod, "/"+shortURL, nil)

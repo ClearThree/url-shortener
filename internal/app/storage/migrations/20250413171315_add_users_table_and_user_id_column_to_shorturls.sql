@@ -13,5 +13,5 @@ CREATE INDEX IF NOT EXISTS short_urls_user_id_idx ON short_url USING HASH (user_
 -- +goose StatementBegin
 DROP INDEX "short_urls_user_id_idx";
 ALTER TABLE "short_url" DROP CONSTRAINT IF EXISTS user_id_foreign_key;
-DROP TABLE users;
+ALTER TABLE "short_url" DROP COLUMN IF EXISTS user_id;
 -- +goose StatementEnd

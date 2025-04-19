@@ -34,7 +34,7 @@ func testRequest(t *testing.T, testServer *httptest.Server, method string, path 
 }
 
 func TestRouter(t *testing.T) {
-	testServer := httptest.NewServer(ShortenURLRouter(nil))
+	testServer := httptest.NewServer(ShortenURLRouter(nil, make(chan struct{})))
 	defer testServer.Close()
 
 	var tests = []struct {
@@ -134,7 +134,7 @@ func TestRouter(t *testing.T) {
 }
 
 func TestCompression(t *testing.T) {
-	testServer := httptest.NewServer(ShortenURLRouter(nil))
+	testServer := httptest.NewServer(ShortenURLRouter(nil, make(chan struct{})))
 	defer testServer.Close()
 	requestBody := `{"url": "https://ya.ru"}`
 
@@ -186,7 +186,7 @@ func TestCompression(t *testing.T) {
 }
 
 func TestAuth(t *testing.T) {
-	testServer := httptest.NewServer(ShortenURLRouter(nil))
+	testServer := httptest.NewServer(ShortenURLRouter(nil, make(chan struct{})))
 	defer testServer.Close()
 	requestBody := "https://ya.ru"
 

@@ -188,9 +188,10 @@ func TestDBRepo_Read(t *testing.T) {
 		id  string
 	}
 	tests := []struct {
-		name string
-		args args
-		want string
+		name        string
+		args        args
+		want        string
+		wantDeleted bool
 	}{
 		{
 			name: "success",
@@ -198,7 +199,8 @@ func TestDBRepo_Read(t *testing.T) {
 				ctx: context.Background(),
 				id:  "lelelele",
 			},
-			want: "lelelele",
+			want:        "lelelele",
+			wantDeleted: false,
 		},
 		{
 			name: "not found",
@@ -206,7 +208,8 @@ func TestDBRepo_Read(t *testing.T) {
 				ctx: context.Background(),
 				id:  "lelelele",
 			},
-			want: "",
+			want:        "",
+			wantDeleted: false,
 		},
 	}
 	for _, tt := range tests {
@@ -216,10 +219,13 @@ func TestDBRepo_Read(t *testing.T) {
 			D := DBRepo{
 				pool: db,
 			}
-			mock.ExpectPrepare("SELECT original_url FROM short_url").ExpectQuery().
+			mock.ExpectPrepare("SELECT original_url, active FROM short_url").ExpectQuery().
 				WithArgs(tt.args.id).
-				WillReturnRows(mock.NewRows([]string{"original_url"}).AddRow(tt.want))
-			assert.Equalf(t, tt.want, D.Read(tt.args.ctx, tt.args.id), "Read(%v, %v)", tt.args.ctx, tt.args.id)
+				WillReturnRows(mock.NewRows([]string{"original_url", "active"}).AddRow(tt.want, tt.wantDeleted))
+
+			res, deleted := D.Read(tt.args.ctx, tt.args.id)
+			assert.Equalf(t, tt.want, res, "Read(%v, %v)", tt.args.ctx, tt.args.id)
+			assert.Equalf(t, !tt.wantDeleted, deleted, "Read(%v, %v)", tt.args.ctx, tt.args.id)
 		})
 	}
 }

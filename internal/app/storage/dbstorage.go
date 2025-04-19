@@ -4,10 +4,12 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
 	"github.com/clearthree/url-shortener/internal/app/logger"
 	"github.com/clearthree/url-shortener/internal/app/models"
 	"github.com/jackc/pgerrcode"
 	"github.com/jackc/pgx/v5/pgconn"
+	"strings"
 )
 
 type DBRepo struct {
@@ -71,18 +73,19 @@ func (D DBRepo) Create(ctx context.Context, id string, originalURL string, userI
 	return id, nil
 }
 
-func (D DBRepo) Read(ctx context.Context, id string) string {
-	readOriginalURLPreparedStmt, err := D.pool.PrepareContext(ctx, "SELECT original_url FROM short_url WHERE short_url = $1")
+func (D DBRepo) Read(ctx context.Context, id string) (string, bool) {
+	readOriginalURLPreparedStmt, err := D.pool.PrepareContext(ctx, "SELECT original_url, active FROM short_url WHERE short_url = $1")
 	if err != nil {
-		return ""
+		return "", false
 	}
 	result := readOriginalURLPreparedStmt.QueryRowContext(ctx, id)
 	var originalURL string
-	err = result.Scan(&originalURL)
+	var active bool
+	err = result.Scan(&originalURL, &active)
 	if err != nil {
-		return ""
+		return "", false
 	}
-	return originalURL
+	return originalURL, !active
 
 }
 
@@ -170,4 +173,46 @@ func (D DBRepo) ReadByUserID(ctx context.Context, userID string) ([]models.Short
 		results = append(results, *URL)
 	}
 	return results, nil
+}
+
+func (D DBRepo) GetUserIDByShortURL(ctx context.Context, shortURL string) (string, error) {
+	getUserIDByShortURLPreparedStmt, err := D.pool.PrepareContext(
+		ctx, "SELECT user_id FROM short_url WHERE short_url = $1")
+	if err != nil {
+		return "", err
+	}
+	result := getUserIDByShortURLPreparedStmt.QueryRowContext(ctx, shortURL)
+	var userID string
+	err = result.Scan(&userID)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return "", nil
+		}
+		return "", err
+	}
+	return userID, nil
+
+}
+
+func (D DBRepo) SetURLsInactive(ctx context.Context, shortURLs []string) error {
+	var values []string
+	var args []any
+	for i, shortURL := range shortURLs {
+		values = append(values, fmt.Sprintf("$%d", i+1))
+		args = append(args, shortURL)
+	}
+	query := `
+		  UPDATE short_url SET active = false, modified_at = NOW()
+		  WHERE short_url in (` + strings.Join(values, ",") + `);`
+
+	setURLsInactivePreparedStmt, err := D.pool.PrepareContext(ctx, query)
+	if err != nil {
+		return err
+	}
+	_, err = setURLsInactivePreparedStmt.ExecContext(ctx, args...)
+	if err != nil {
+		return err
+	}
+
+	return err
 }

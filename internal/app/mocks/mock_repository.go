@@ -65,6 +65,21 @@ func (mr *MockRepositoryMockRecorder) Create(arg0, arg1, arg2, arg3 interface{})
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Create", reflect.TypeOf((*MockRepository)(nil).Create), arg0, arg1, arg2, arg3)
 }
 
+// GetUserIDByShortURL mocks base method.
+func (m *MockRepository) GetUserIDByShortURL(arg0 context.Context, arg1 string) (string, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetUserIDByShortURL", arg0, arg1)
+	ret0, _ := ret[0].(string)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetUserIDByShortURL indicates an expected call of GetUserIDByShortURL.
+func (mr *MockRepositoryMockRecorder) GetUserIDByShortURL(arg0, arg1 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetUserIDByShortURL", reflect.TypeOf((*MockRepository)(nil).GetUserIDByShortURL), arg0, arg1)
+}
+
 // Ping mocks base method.
 func (m *MockRepository) Ping(arg0 context.Context) error {
 	m.ctrl.T.Helper()
@@ -80,11 +95,12 @@ func (mr *MockRepositoryMockRecorder) Ping(arg0 interface{}) *gomock.Call {
 }
 
 // Read mocks base method.
-func (m *MockRepository) Read(arg0 context.Context, arg1 string) string {
+func (m *MockRepository) Read(arg0 context.Context, arg1 string) (string, bool) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Read", arg0, arg1)
 	ret0, _ := ret[0].(string)
-	return ret0
+	ret1, _ := ret[1].(bool)
+	return ret0, ret1
 }
 
 // Read indicates an expected call of Read.
@@ -106,4 +122,18 @@ func (m *MockRepository) ReadByUserID(arg0 context.Context, arg1 string) ([]mode
 func (mr *MockRepositoryMockRecorder) ReadByUserID(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ReadByUserID", reflect.TypeOf((*MockRepository)(nil).ReadByUserID), arg0, arg1)
+}
+
+// SetURLsInactive mocks base method.
+func (m *MockRepository) SetURLsInactive(arg0 context.Context, arg1 []string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "SetURLsInactive", arg0, arg1)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// SetURLsInactive indicates an expected call of SetURLsInactive.
+func (mr *MockRepositoryMockRecorder) SetURLsInactive(arg0, arg1 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetURLsInactive", reflect.TypeOf((*MockRepository)(nil).SetURLsInactive), arg0, arg1)
 }

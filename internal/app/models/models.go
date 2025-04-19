@@ -1,5 +1,7 @@
 package models
 
+import "context"
+
 type ShortenRequest struct {
 	URL string `json:"url"`
 }
@@ -21,4 +23,10 @@ type ShortenBatchItemResponse struct {
 type ShortURLsByUserResponse struct {
 	ShortURL    string `json:"short_url"`
 	OriginalURL string `json:"original_url"`
+}
+
+type ShortURLChannelMessage struct {
+	Ctx      context.Context
+	ShortURL string
+	UserID   string
 }

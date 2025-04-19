@@ -15,31 +15,37 @@ import (
 )
 
 type RepoMock struct {
-	localStorage    map[string]string
-	localIDsStorage map[string][]string
+	localStorage                map[string]string
+	localIDsStorage             map[string][]string
+	localStorageUsersByURLs     map[string]string
+	localStorageDeactivatedURLs map[string]bool
 }
 
 func (rm RepoMock) Create(_ context.Context, id string, originalURL string, userID string) (string, error) {
 	if rm.localStorage == nil {
 		rm.localStorage = make(map[string]string)
 		rm.localIDsStorage = make(map[string][]string)
+		rm.localStorageUsersByURLs = make(map[string]string)
 	}
 	rm.localStorage[id] = originalURL
+	rm.localStorageUsersByURLs[id] = userID
 	currentShortURLs := rm.localIDsStorage[userID]
 	currentShortURLs = append(currentShortURLs, id)
 	rm.localIDsStorage[userID] = currentShortURLs
 	return id, nil
 }
 
-func (rm RepoMock) Read(_ context.Context, id string) string {
+func (rm RepoMock) Read(_ context.Context, id string) (string, bool) {
 	if rm.localStorage == nil {
 		rm.localStorage = make(map[string]string)
+		rm.localStorageDeactivatedURLs = make(map[string]bool)
 	}
 	originalURL, ok := rm.localStorage[id]
 	if !ok {
-		return ""
+		return "", false
 	}
-	return originalURL
+	_, deleted := rm.localStorageDeactivatedURLs[id]
+	return originalURL, deleted
 }
 
 func (rm RepoMock) Ping(_ context.Context) error {
@@ -65,6 +71,10 @@ func (rm RepoMock) ReadByUserID(_ context.Context, userID string) ([]models.Shor
 	}
 	result := make([]models.ShortURLsByUserResponse, len(currentShortURLs))
 	for _, shortURL := range currentShortURLs {
+		_, deleted := rm.localStorageDeactivatedURLs[shortURL]
+		if deleted {
+			continue
+		}
 		result = append(result, models.ShortURLsByUserResponse{
 			ShortURL:    shortURL,
 			OriginalURL: rm.localStorage[shortURL],
@@ -73,9 +83,25 @@ func (rm RepoMock) ReadByUserID(_ context.Context, userID string) ([]models.Shor
 	return result, nil
 }
 
+func (rm RepoMock) GetUserIDByShortURL(_ context.Context, shortURL string) (string, error) {
+	_, ok := rm.localStorageDeactivatedURLs[shortURL]
+	if ok {
+		return "", nil
+	}
+	return rm.localStorageUsersByURLs[shortURL], nil
+}
+
+func (rm RepoMock) SetURLsInactive(_ context.Context, shortURLs []string) error {
+	for _, shortURL := range shortURLs {
+		rm.localStorageDeactivatedURLs[shortURL] = true
+	}
+	return nil
+}
+
 func TestNewService(t *testing.T) {
 	type args struct {
-		repo storage.Repository
+		repo     storage.Repository
+		doneChan chan struct{}
 	}
 	tests := []struct {
 		name string
@@ -84,13 +110,27 @@ func TestNewService(t *testing.T) {
 	}{
 		{
 			name: "Successful creation of service",
-			args: args{RepoMock{make(map[string]string), make(map[string][]string)}},
-			want: ShortURLService{RepoMock{make(map[string]string), make(map[string][]string)}},
+			args: args{RepoMock{
+				make(map[string]string),
+				make(map[string][]string),
+				make(map[string]string),
+				make(map[string]bool),
+			},
+				make(chan struct{})},
+			want: ShortURLService{
+				repo: RepoMock{
+					make(map[string]string),
+					make(map[string][]string),
+					make(map[string]string),
+					make(map[string]bool),
+				},
+			},
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			assert.Equal(t, tt.want, NewService(tt.args.repo))
+
+			assert.Equal(t, tt.want.repo, NewService(tt.args.repo, tt.args.doneChan).repo)
 		})
 	}
 }
@@ -111,14 +151,24 @@ func TestShortURLService_Create(t *testing.T) {
 		wantErr bool
 	}{
 		{
-			name:    "Successful creation of short URL",
-			fields:  fields{repo: RepoMock{make(map[string]string), make(map[string][]string)}},
+			name: "Successful creation of short URL",
+			fields: fields{repo: RepoMock{
+				make(map[string]string),
+				make(map[string][]string),
+				make(map[string]string),
+				make(map[string]bool),
+			}},
 			args:    args{originalURL: "https://ya.ru", userID: "ImagineThisIsTheUUID"},
 			wantErr: false,
 		},
 		{
-			name:   "Successful creation of short url with long original URL",
-			fields: fields{repo: RepoMock{make(map[string]string), make(map[string][]string)}},
+			name: "Successful creation of short url with long original URL",
+			fields: fields{repo: RepoMock{
+				make(map[string]string),
+				make(map[string][]string),
+				make(map[string]string),
+				make(map[string]bool),
+			}},
 			args: args{
 				ctx:         context.Background(),
 				originalURL: "https://example.com/veeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeerylong",
@@ -185,7 +235,7 @@ func TestShortURLService_CreateWithError(t *testing.T) {
 			}
 			repoMock.EXPECT().
 				Read(tt.args.ctx, gomock.Any()).
-				Return("")
+				Return("", false)
 			repoMock.EXPECT().
 				Create(tt.args.ctx, gomock.Any(), tt.args.originalURL, tt.args.userID).
 				Return(tt.mockReturns, tt.mockReturnsErr)
@@ -216,15 +266,27 @@ func TestShortURLService_Read(t *testing.T) {
 		wantErr error
 	}{
 		{
-			name:    "Successful read of short URL",
-			fields:  fields{repo: RepoMock{map[string]string{"LElElelE": "https://ya.ru"}, map[string][]string{"ImagineThisIsTheUUID": {"LElElelE"}}}},
+			name: "Successful read of short URL",
+			fields: fields{repo: RepoMock{
+				map[string]string{"LElElelE": "https://ya.ru"},
+				map[string][]string{"ImagineThisIsTheUUID": {"LElElelE"}},
+				map[string]string{"LElElelE": "ImagineThisIsTheUUID"},
+				map[string]bool{}},
+			},
 			args:    args{id: "LElElelE"},
 			want:    "https://ya.ru",
 			wantErr: nil,
 		},
 		{
-			name:    "Unsuccessful read of short URL",
-			fields:  fields{repo: RepoMock{make(map[string]string), make(map[string][]string)}},
+			name: "Unsuccessful read of short URL",
+			fields: fields{
+				repo: RepoMock{
+					make(map[string]string),
+					make(map[string][]string),
+					map[string]string{"LElElelE": "ImagineThisIsTheUUID"},
+					map[string]bool{},
+				},
+			},
 			args:    args{id: "NoNeXiSt"},
 			want:    "",
 			wantErr: ErrShortURLNotFound,
@@ -235,11 +297,12 @@ func TestShortURLService_Read(t *testing.T) {
 			s := &ShortURLService{
 				repo: tt.fields.repo,
 			}
-			got, err := s.Read(tt.args.ctx, tt.args.id)
+			got, deleted, err := s.Read(tt.args.ctx, tt.args.id)
 			if tt.wantErr != nil {
 				assert.ErrorIs(t, err, tt.wantErr)
 			}
 			assert.Equal(t, tt.want, got)
+			assert.Equal(t, false, deleted)
 		})
 	}
 }
@@ -261,14 +324,24 @@ func TestShortURLService_FillRow(t *testing.T) {
 		wantErr bool
 	}{
 		{
-			name:    "Successful filling of short URL",
-			fields:  fields{repo: RepoMock{make(map[string]string), make(map[string][]string)}},
+			name: "Successful filling of short URL",
+			fields: fields{repo: RepoMock{
+				make(map[string]string),
+				make(map[string][]string),
+				make(map[string]string),
+				make(map[string]bool),
+			}},
 			args:    args{ctx: context.Background(), originalURL: "https://ya.ru"},
 			wantErr: false,
 		},
 		{
-			name:   "Successful filling of short url with long original URL",
-			fields: fields{repo: RepoMock{make(map[string]string), make(map[string][]string)}},
+			name: "Successful filling of short url with long original URL",
+			fields: fields{repo: RepoMock{
+				make(map[string]string),
+				make(map[string][]string),
+				make(map[string]string),
+				make(map[string]bool),
+			}},
 			args: args{
 				ctx:         context.Background(),
 				originalURL: "https://example.com/veeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeerylong",
@@ -286,7 +359,9 @@ func TestShortURLService_FillRow(t *testing.T) {
 				t.Errorf("Create() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			assert.Equal(t, tt.fields.repo.Read(tt.args.ctx, tt.args.shortURL), tt.args.originalURL)
+			res, deleted := tt.fields.repo.Read(tt.args.ctx, tt.args.shortURL)
+			assert.Equal(t, tt.args.originalURL, res)
+			assert.Equal(t, false, deleted)
 		})
 	}
 }

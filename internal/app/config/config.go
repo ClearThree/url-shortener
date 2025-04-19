@@ -10,13 +10,15 @@ import (
 )
 
 type Config struct {
-	Address         string `env:"SERVER_ADDRESS"`
-	HostedOn        string `env:"BASE_URL"`
-	LogLevel        string `env:"LOG_LEVEL" envDefault:"INFO"`
-	FileStoragePath string `env:"FILE_STORAGE_PATH"`
-	DatabaseDSN     string `env:"DATABASE_DSN"`
-	SecretKey       string `env:"SECRET_KEY" envDefault:"DontUseThatInProduction"`
-	JWTExpireHours  int64  `env:"JWT_EXPIRE_HOURS" envDefault:"96"`
+	Address                            string `env:"SERVER_ADDRESS"`
+	HostedOn                           string `env:"BASE_URL"`
+	LogLevel                           string `env:"LOG_LEVEL" envDefault:"INFO"`
+	FileStoragePath                    string `env:"FILE_STORAGE_PATH"`
+	DatabaseDSN                        string `env:"DATABASE_DSN"`
+	SecretKey                          string `env:"SECRET_KEY" envDefault:"DontUseThatInProduction"`
+	JWTExpireHours                     int64  `env:"JWT_EXPIRE_HOURS" envDefault:"96"`
+	DefaultChannelsBufferSize          int64  `env:"DEFAULT_CHANNELS_BUFFER_SIZE" envDefault:"1024"`
+	DeletionBufferFlushIntervalSeconds int64  `env:"DELETION_BUFFER_FLUSH_INTERVAL_SECONDS" envDefault:"10"`
 }
 
 func (cfg *Config) Sanitize() {
@@ -172,4 +174,5 @@ func init() {
 	Settings.FileStoragePath = "./storage.json"
 	Settings.DatabaseDSN = ""
 	Settings.SecretKey = "DontUseThatInProduction" // Ожидается, что настоящий ключ будет передан через env
+	Settings.DeletionBufferFlushIntervalSeconds = 1
 }

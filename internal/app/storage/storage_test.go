@@ -89,8 +89,9 @@ func TestMemoryRepo_Read(t *testing.T) {
 				_, err := m.Create(context.Background(), k, v, "SomeUserID")
 				require.NoError(t, err)
 			}
-			got := m.Read(tt.args.ctx, tt.args.id)
+			got, deleted := m.Read(tt.args.ctx, tt.args.id)
 			assert.Equal(t, tt.want, got)
+			assert.Equal(t, false, deleted)
 		})
 	}
 }
