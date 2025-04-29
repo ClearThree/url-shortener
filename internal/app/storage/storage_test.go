@@ -6,7 +6,6 @@ import (
 	"github.com/clearthree/url-shortener/internal/app/models"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"reflect"
 	"testing"
 )
 
@@ -15,6 +14,7 @@ func TestMemoryRepo_Create(t *testing.T) {
 		ctx         context.Context
 		id          string
 		originalURL string
+		userID      string
 	}
 	tests := []struct {
 		name string
@@ -23,32 +23,32 @@ func TestMemoryRepo_Create(t *testing.T) {
 	}{
 		{
 			name: "Successful addition of URL to memory",
-			args: args{context.Background(), "lele", "https://ya.ru"},
+			args: args{context.Background(), "lele", "https://ya.ru", "SomeUserID"},
 			want: "lele",
 		},
 		{
 			// The Repository doesn't even have to know what kind of data it stores, so let's check it out
 			name: "Successful addition of something to memory",
-			args: args{context.Background(), "lele", "something"},
+			args: args{context.Background(), "lele", "something", "SomeUserID"},
 			want: "lele",
 		},
 		{
 			// It also doesn't care about any business logic limitations for keys, values etc.
 			name: "Successful addition of something with long ID to memory",
-			args: args{context.Background(), "longerThanUsualID", "definitelyNotAnURL"},
+			args: args{context.Background(), "longerThanUsualID", "definitelyNotAnURL", "SomeUserID"},
 			want: "longerThanUsualID",
 		},
 		{
 			// Empty key is also not a problem, even though it's an impossible case
 			name: "Empty key success",
-			args: args{context.Background(), "", "doesntMatter"},
+			args: args{context.Background(), "", "doesntMatter", "SomeUserID"},
 			want: "",
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			m := MemoryRepo{}
-			if got, err := m.Create(tt.args.ctx, tt.args.id, tt.args.originalURL); got != tt.want {
+			if got, err := m.Create(tt.args.ctx, tt.args.id, tt.args.originalURL, tt.args.userID); got != tt.want {
 				require.NoError(t, err)
 				t.Errorf("Create() = %v, want %v", got, tt.want)
 			}
@@ -86,11 +86,12 @@ func TestMemoryRepo_Read(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			m := MemoryRepo{}
 			for k, v := range tt.preLoad {
-				_, err := m.Create(context.Background(), k, v)
+				_, err := m.Create(context.Background(), k, v, "SomeUserID")
 				require.NoError(t, err)
 			}
-			got := m.Read(tt.args.ctx, tt.args.id)
+			got, deleted := m.Read(tt.args.ctx, tt.args.id)
 			assert.Equal(t, tt.want, got)
+			assert.Equal(t, false, deleted)
 		})
 	}
 }
@@ -122,8 +123,9 @@ func TestMemoryRepo_Ping(t *testing.T) {
 
 func TestMemoryRepo_BatchCreate(t *testing.T) {
 	type args struct {
-		ctx  context.Context
-		URLs map[string]models.ShortenBatchItemRequest
+		ctx    context.Context
+		URLs   map[string]models.ShortenBatchItemRequest
+		userID string
 	}
 	tests := []struct {
 		name string
@@ -138,6 +140,7 @@ func TestMemoryRepo_BatchCreate(t *testing.T) {
 					"lele": {CorrelationID: "lelele", OriginalURL: "https://ya.ru"},
 					"lolo": {CorrelationID: "lololo", OriginalURL: "https://yandex.ru"},
 				},
+				userID: "SomeUserID",
 			},
 			want: []models.ShortenBatchItemResponse{
 				{CorrelationID: "lelele", ShortURL: "lele"},
@@ -151,6 +154,7 @@ func TestMemoryRepo_BatchCreate(t *testing.T) {
 				URLs: map[string]models.ShortenBatchItemRequest{
 					"lele": {CorrelationID: "lelele", OriginalURL: "https://ya.ru"},
 				},
+				userID: "SomeUserID",
 			},
 			want: []models.ShortenBatchItemResponse{
 				{CorrelationID: "lelele", ShortURL: "lele"},
@@ -160,10 +164,60 @@ func TestMemoryRepo_BatchCreate(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			m := MemoryRepo{}
-			got, err := m.BatchCreate(tt.args.ctx, tt.args.URLs)
+			got, err := m.BatchCreate(tt.args.ctx, tt.args.URLs, tt.args.userID)
 			require.NoError(t, err)
-			eq := reflect.DeepEqual(got, tt.want)
-			assert.Equal(t, eq, true)
+			for _, item := range tt.want {
+				assert.Contains(t, got, item)
+			}
+		})
+	}
+}
+
+func TestMemoryRepo_ReadByUserID(t *testing.T) {
+	type args struct {
+		ctx    context.Context
+		userID string
+	}
+	tests := []struct {
+		name string
+		args args
+		want []models.ShortURLsByUserResponse
+	}{
+		{
+			name: "Successful read",
+			args: args{
+				ctx:    context.Background(),
+				userID: "SomeUniqueUserID",
+			},
+			want: []models.ShortURLsByUserResponse{
+				{
+					ShortURL:    "lelele",
+					OriginalURL: "http://ya.ru",
+				},
+				{
+					ShortURL:    "lololo",
+					OriginalURL: "http://yandex.ru",
+				},
+			},
+		},
+		{
+			name: "Successful read of empty list of urls",
+			args: args{
+				ctx:    context.Background(),
+				userID: "SomeUniqueUserID2",
+			},
+			want: nil,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			m := MemoryRepo{}
+			for _, v := range tt.want {
+				m.Create(tt.args.ctx, v.ShortURL, v.OriginalURL, tt.args.userID)
+			}
+			got, err := m.ReadByUserID(tt.args.ctx, tt.args.userID)
+			require.NoError(t, err)
+			assert.Equalf(t, tt.want, got, "ReadByUserID(%v, %v)", tt.args.ctx, tt.args.userID)
 		})
 	}
 }

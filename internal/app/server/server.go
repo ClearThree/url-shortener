@@ -21,26 +21,32 @@ import (
 var Pool *sql.DB
 var shortURLService service.ShortURLService
 
-func ShortenURLRouter(pool *sql.DB) chi.Router {
+func ShortenURLRouter(pool *sql.DB, doneChan chan struct{}) chi.Router {
 	if pool == nil {
-		shortURLService = service.NewService(storage.MemoryRepo{})
+		shortURLService = service.NewService(storage.MemoryRepo{}, doneChan)
 	} else {
-		shortURLService = service.NewService(storage.NewDBRepo(pool))
+		shortURLService = service.NewService(storage.NewDBRepo(pool), doneChan)
 	}
+	var shortURLServiceDB = service.NewService(storage.NewDBRepo(pool), doneChan)
+
 	var createHandler = handlers.NewCreateShortURLHandler(&shortURLService)
 	var createJSONShortURLHandler = handlers.NewCreateJSONShortURLHandler(&shortURLService)
 	var redirectHandler = handlers.NewRedirectToOriginalURLHandler(&shortURLService)
-	var shortURLServiceDB = service.NewService(storage.NewDBRepo(pool))
 	var pingHandler = handlers.NewPingHandler(&shortURLServiceDB)
 	var batchCreateHandler = handlers.NewBatchCreateShortURLHandler(&shortURLService)
+	var getAllUrlsByUserHandler = handlers.NewGetAllURLsForUserHandler(&shortURLService)
+	var deleteBatchOfURLsHandler = handlers.NewDeleteBatchOfURLsHandler(&shortURLService)
 
 	router := chi.NewRouter()
 	router.Use(middlewares.RequestLogger)
+	router.Use(middlewares.AuthMiddleware)
 	router.Use(middlewares.GzipMiddleware)
 	router.Use(middleware.Recoverer)
 	router.Post("/", createHandler.ServeHTTP)
 	router.Post("/api/shorten", createJSONShortURLHandler.ServeHTTP)
 	router.Post("/api/shorten/batch", batchCreateHandler.ServeHTTP)
+	router.Get("/api/user/urls", getAllUrlsByUserHandler.ServeHTTP)
+	router.Delete("/api/user/urls", deleteBatchOfURLsHandler.ServeHTTP)
 	router.Get("/{id}", redirectHandler.ServeHTTP)
 	router.Get("/ping", pingHandler.ServeHTTP)
 	return router
@@ -76,8 +82,9 @@ func Run(addr string) error {
 		}
 		defer storage.FSWrapper.Close()
 	}
+	doneChan := make(chan struct{})
 	logger.Log.Info("Server initiation completed, starting to serve")
-	return http.ListenAndServe(addr, ShortenURLRouter(Pool))
+	return http.ListenAndServe(addr, ShortenURLRouter(Pool, doneChan))
 }
 
 func prefillMemory() error {
@@ -90,8 +97,8 @@ func prefillMemory() error {
 				return err
 			}
 		}
-		shortURLService = service.NewService(storage.MemoryRepo{})
-		fillingError := shortURLService.FillRow(context.Background(), row.OriginalURL, row.ShortURL)
+		shortURLService = service.NewService(storage.MemoryRepo{}, make(chan struct{}))
+		fillingError := shortURLService.FillRow(context.Background(), row.OriginalURL, row.ShortURL, row.UserID)
 		if fillingError != nil {
 			return fillingError
 		}

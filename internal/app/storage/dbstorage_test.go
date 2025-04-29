@@ -19,6 +19,7 @@ func TestDBRepo_Create(t *testing.T) {
 		ctx         context.Context
 		id          string
 		originalURL string
+		userID      string
 	}
 	tests := []struct {
 		name    string
@@ -32,6 +33,7 @@ func TestDBRepo_Create(t *testing.T) {
 				ctx:         context.Background(),
 				id:          "lelelele",
 				originalURL: "http://ya.ru",
+				userID:      "SomeUserID",
 			},
 			want:    "lelelele",
 			wantErr: assert.NoError,
@@ -41,18 +43,23 @@ func TestDBRepo_Create(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			db, mock, err := sqlmock.New()
 			require.NoError(t, err)
-
 			D := DBRepo{
 				pool: db,
 			}
-			mock.ExpectPrepare("INSERT INTO short_url").ExpectExec().
-				WithArgs(tt.args.id, tt.args.originalURL).
+			mock.ExpectBegin()
+			mock.ExpectPrepare("INSERT INTO users").ExpectExec().
+				WithArgs(tt.args.userID).
 				WillReturnResult(sqlmock.NewResult(1, 1))
-			got, err := D.Create(tt.args.ctx, tt.args.id, tt.args.originalURL)
-			if !tt.wantErr(t, err, fmt.Sprintf("Create(%v, %v, %v)", tt.args.ctx, tt.args.id, tt.args.originalURL)) {
+
+			mock.ExpectPrepare("INSERT INTO short_url").ExpectExec().
+				WithArgs(tt.args.id, tt.args.originalURL, tt.args.userID).
+				WillReturnResult(sqlmock.NewResult(1, 1))
+			mock.ExpectCommit()
+			got, err := D.Create(tt.args.ctx, tt.args.id, tt.args.originalURL, tt.args.userID)
+			if !tt.wantErr(t, err, fmt.Sprintf("Create(%v, %v, %v, %v)", tt.args.ctx, tt.args.id, tt.args.originalURL, tt.args.userID)) {
 				return
 			}
-			assert.Equalf(t, tt.want, got, "Create(%v, %v, %v)", tt.args.ctx, tt.args.id, tt.args.originalURL)
+			assert.Equalf(t, tt.want, got, "Create(%v, %v, %v, %v)", tt.args.ctx, tt.args.id, tt.args.originalURL, tt.args.userID)
 		})
 	}
 }
@@ -62,6 +69,7 @@ func TestDBRepo_CreateAlreadyExists(t *testing.T) {
 		ctx         context.Context
 		id          string
 		originalURL string
+		userID      string
 		errorCode   string
 	}
 	tests := []struct {
@@ -77,6 +85,7 @@ func TestDBRepo_CreateAlreadyExists(t *testing.T) {
 				ctx:         context.Background(),
 				id:          "lelelele",
 				originalURL: "http://ya.ru",
+				userID:      "SomeUserID",
 				errorCode:   pgerrcode.UniqueViolation,
 			},
 			want:              "lelelele",
@@ -89,6 +98,7 @@ func TestDBRepo_CreateAlreadyExists(t *testing.T) {
 				ctx:         context.Background(),
 				id:          "lelelele",
 				originalURL: "http://ya.ru",
+				userID:      "SomeUserID",
 				errorCode:   pgerrcode.DatabaseDropped,
 			},
 			want:              "",
@@ -104,21 +114,25 @@ func TestDBRepo_CreateAlreadyExists(t *testing.T) {
 			D := DBRepo{
 				pool: db,
 			}
+			mock.ExpectBegin()
+			mock.ExpectPrepare("INSERT INTO users").ExpectExec().
+				WithArgs(tt.args.userID).
+				WillReturnResult(sqlmock.NewResult(1, 1))
 			mock.ExpectPrepare("INSERT INTO short_url").ExpectExec().
-				WithArgs(tt.args.id, tt.args.originalURL).
+				WithArgs(tt.args.id, tt.args.originalURL, tt.args.userID).
 				WillReturnError(&pgconn.PgError{Code: tt.args.errorCode})
 			mock.ExpectPrepare("SELECT short_url FROM short_url").ExpectQuery().
 				WithArgs(tt.args.originalURL).
 				WillReturnRows(mock.NewRows([]string{"short_url"}).AddRow(tt.want))
-
-			got, err := D.Create(tt.args.ctx, tt.args.id, tt.args.originalURL)
-			if !tt.wantErr(t, err, fmt.Sprintf("Create(%v, %v, %v)", tt.args.ctx, tt.args.id, tt.args.originalURL)) {
+			mock.ExpectRollback()
+			got, err := D.Create(tt.args.ctx, tt.args.id, tt.args.originalURL, tt.args.userID)
+			if !tt.wantErr(t, err, fmt.Sprintf("Create(%v, %v, %v, %v)", tt.args.ctx, tt.args.id, tt.args.originalURL, tt.args.userID)) {
 				return
 			}
 			if tt.shouldBeCustomErr {
 				assert.ErrorIs(t, err, ErrAlreadyExists)
 			}
-			assert.Equalf(t, tt.want, got, "Create(%v, %v, %v)", tt.args.ctx, tt.args.id, tt.args.originalURL)
+			assert.Equalf(t, tt.want, got, "Create(%v, %v, %v, %v)", tt.args.ctx, tt.args.id, tt.args.originalURL, tt.args.userID)
 		})
 	}
 }
@@ -174,9 +188,10 @@ func TestDBRepo_Read(t *testing.T) {
 		id  string
 	}
 	tests := []struct {
-		name string
-		args args
-		want string
+		name        string
+		args        args
+		want        string
+		wantDeleted bool
 	}{
 		{
 			name: "success",
@@ -184,7 +199,8 @@ func TestDBRepo_Read(t *testing.T) {
 				ctx: context.Background(),
 				id:  "lelelele",
 			},
-			want: "lelelele",
+			want:        "lelelele",
+			wantDeleted: false,
 		},
 		{
 			name: "not found",
@@ -192,7 +208,8 @@ func TestDBRepo_Read(t *testing.T) {
 				ctx: context.Background(),
 				id:  "lelelele",
 			},
-			want: "",
+			want:        "",
+			wantDeleted: false,
 		},
 	}
 	for _, tt := range tests {
@@ -202,10 +219,13 @@ func TestDBRepo_Read(t *testing.T) {
 			D := DBRepo{
 				pool: db,
 			}
-			mock.ExpectPrepare("SELECT original_url FROM short_url").ExpectQuery().
+			mock.ExpectPrepare("SELECT original_url, active FROM short_url").ExpectQuery().
 				WithArgs(tt.args.id).
-				WillReturnRows(mock.NewRows([]string{"original_url"}).AddRow(tt.want))
-			assert.Equalf(t, tt.want, D.Read(tt.args.ctx, tt.args.id), "Read(%v, %v)", tt.args.ctx, tt.args.id)
+				WillReturnRows(mock.NewRows([]string{"original_url", "active"}).AddRow(tt.want, tt.wantDeleted))
+
+			res, deleted := D.Read(tt.args.ctx, tt.args.id)
+			assert.Equalf(t, tt.want, res, "Read(%v, %v)", tt.args.ctx, tt.args.id)
+			assert.Equalf(t, !tt.wantDeleted, deleted, "Read(%v, %v)", tt.args.ctx, tt.args.id)
 		})
 	}
 }
@@ -238,8 +258,9 @@ func TestNewDBRepo(t *testing.T) {
 
 func TestDBRepo_BatchCreate(t *testing.T) {
 	type args struct {
-		ctx  context.Context
-		URLs map[string]models.ShortenBatchItemRequest
+		ctx    context.Context
+		URLs   map[string]models.ShortenBatchItemRequest
+		userID string
 	}
 	tests := []struct {
 		name    string
@@ -255,6 +276,7 @@ func TestDBRepo_BatchCreate(t *testing.T) {
 					"lele": {CorrelationID: "lelele", OriginalURL: "https://ya.ru"},
 					"lolo": {CorrelationID: "lololo", OriginalURL: "https://yandex.ru"},
 				},
+				userID: "SomeUserID",
 			},
 			want: []models.ShortenBatchItemResponse{
 				{CorrelationID: "lelele", ShortURL: "lele"},
@@ -269,6 +291,7 @@ func TestDBRepo_BatchCreate(t *testing.T) {
 				URLs: map[string]models.ShortenBatchItemRequest{
 					"lele": {CorrelationID: "lelele", OriginalURL: "https://ya.ru"},
 				},
+				userID: "SomeUserID",
 			},
 			want: []models.ShortenBatchItemResponse{
 				{CorrelationID: "lelele", ShortURL: "lele"},
@@ -284,6 +307,10 @@ func TestDBRepo_BatchCreate(t *testing.T) {
 				pool: db,
 			}
 			mock.ExpectBegin()
+			mock.ExpectPrepare("INSERT INTO users").ExpectExec().
+				WithArgs(tt.args.userID).
+				WillReturnResult(sqlmock.NewResult(1, 1))
+
 			mockStatement := mock.ExpectPrepare("INSERT INTO short_url")
 			for range tt.args.URLs {
 				mockStatement.
@@ -291,11 +318,11 @@ func TestDBRepo_BatchCreate(t *testing.T) {
 					WillReturnResult(sqlmock.NewResult(1, 1))
 			}
 			mock.ExpectCommit()
-			got, err := D.BatchCreate(tt.args.ctx, tt.args.URLs)
-			if !tt.wantErr(t, err, fmt.Sprintf("BatchCreate(%v, %v)", tt.args.ctx, tt.args.URLs)) {
+			got, err := D.BatchCreate(tt.args.ctx, tt.args.URLs, tt.args.userID)
+			if !tt.wantErr(t, err, fmt.Sprintf("BatchCreate(%v, %v, %v)", tt.args.ctx, tt.args.URLs, tt.args.userID)) {
 				return
 			}
-			assert.ElementsMatchf(t, tt.want, got, "BatchCreate(%v, %v)", tt.args.ctx, tt.args.URLs)
+			assert.ElementsMatchf(t, tt.want, got, "BatchCreate(%v, %v, %v)", tt.args.ctx, tt.args.URLs, tt.args.userID)
 		})
 	}
 }
@@ -339,6 +366,71 @@ func TestDBRepo_GetShortURLByOriginalURL(t *testing.T) {
 				WillReturnRows(mock.NewRows([]string{"short_url"}).AddRow(tt.want))
 			res, err := D.GetShortURLByOriginalURL(tt.args.ctx, tt.args.originalURL)
 			assert.Equalf(t, tt.want, res, "GetShortURLByOriginalURL(%v, %v)", tt.args.ctx, tt.args.originalURL)
+			require.NoError(t, err)
+		})
+	}
+}
+
+func TestDBRepo_ReadByUserID(t *testing.T) {
+	type args struct {
+		ctx    context.Context
+		userID string
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    []models.ShortURLsByUserResponse
+		wantErr assert.ErrorAssertionFunc
+	}{
+		{
+			name: "Successful batch read",
+			args: args{
+				ctx:    context.Background(),
+				userID: "SomeUserID",
+			},
+			want: []models.ShortURLsByUserResponse{
+				{
+					ShortURL:    "lelele",
+					OriginalURL: "http://ya.ru",
+				},
+				{
+					ShortURL:    "lololo",
+					OriginalURL: "http://yandex.ru",
+				},
+			},
+			wantErr: assert.NoError,
+		},
+		{
+			name: "Successful batch read of empty list",
+			args: args{
+				ctx:    context.Background(),
+				userID: "SomeUserID",
+			},
+			want:    []models.ShortURLsByUserResponse{},
+			wantErr: assert.NoError,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			db, mock, err := sqlmock.New()
+			require.NoError(t, err)
+			D := DBRepo{
+				pool: db,
+			}
+			var rs *sqlmock.Rows
+			if len(tt.want) > 0 {
+				rs = mock.NewRows([]string{"short_url", "original_url"}).
+					AddRow(tt.want[0].ShortURL, tt.want[0].OriginalURL).
+					AddRow(tt.want[1].ShortURL, tt.want[1].OriginalURL)
+			} else {
+				rs = mock.NewRows([]string{"short_url", "original_url"})
+			}
+
+			mock.ExpectPrepare("SELECT short_url, original_url FROM short_url").ExpectQuery().
+				WithArgs(tt.args.userID).
+				WillReturnRows(rs)
+			res, err := D.ReadByUserID(tt.args.ctx, tt.args.userID)
+			assert.Equalf(t, tt.want, res, "ReadByUserID(%v, %v)", tt.args.ctx, tt.args.userID)
 			require.NoError(t, err)
 		})
 	}

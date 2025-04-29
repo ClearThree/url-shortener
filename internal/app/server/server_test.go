@@ -3,6 +3,7 @@ package server
 import (
 	"bytes"
 	"compress/gzip"
+	"github.com/clearthree/url-shortener/internal/app/middlewares"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"io"
@@ -33,7 +34,7 @@ func testRequest(t *testing.T, testServer *httptest.Server, method string, path 
 }
 
 func TestRouter(t *testing.T) {
-	testServer := httptest.NewServer(ShortenURLRouter(nil))
+	testServer := httptest.NewServer(ShortenURLRouter(nil, make(chan struct{})))
 	defer testServer.Close()
 
 	var tests = []struct {
@@ -133,7 +134,7 @@ func TestRouter(t *testing.T) {
 }
 
 func TestCompression(t *testing.T) {
-	testServer := httptest.NewServer(ShortenURLRouter(nil))
+	testServer := httptest.NewServer(ShortenURLRouter(nil, make(chan struct{})))
 	defer testServer.Close()
 	requestBody := `{"url": "https://ya.ru"}`
 
@@ -181,5 +182,116 @@ func TestCompression(t *testing.T) {
 		_, err = io.ReadAll(gzipReader)
 		require.NoError(t, err)
 
+	})
+}
+
+func TestAuth(t *testing.T) {
+	testServer := httptest.NewServer(ShortenURLRouter(nil, make(chan struct{})))
+	defer testServer.Close()
+	requestBody := "https://ya.ru"
+
+	t.Run("without_token_we_receive_it", func(t *testing.T) {
+		body := strings.NewReader(requestBody)
+		request, err := http.NewRequest(http.MethodPost, testServer.URL+"/", body)
+		require.NoError(t, err)
+		request.Header.Set("Content-Type", "text/plain")
+
+		resp, err := testServer.Client().Do(request)
+		require.NoError(t, err)
+		require.Equal(t, http.StatusCreated, resp.StatusCode)
+
+		defer resp.Body.Close()
+
+		_, err = io.ReadAll(resp.Body)
+		require.NoError(t, err)
+		require.NotEmpty(t, resp.Header.Get("Set-Cookie"))
+	})
+
+	t.Run("with_expired_token_we_receive_new_one", func(t *testing.T) {
+		body := strings.NewReader(requestBody)
+		request, err := http.NewRequest(http.MethodPost, testServer.URL+"/", body)
+		require.NoError(t, err)
+		request.Header.Set("Content-Type", "text/plain")
+		request.AddCookie(&http.Cookie{
+			Name:  middlewares.AuthCookieName,
+			Value: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJjbGVhcnRocmVlIiwiZXhwIjoxNzQ0NjU5ODI1LCJpYXQiOjE3NDQ2NTk4MjQsInVzZXJfaWQiOiJkYWNlNGQ2OC0yZjk2LTQzODMtYTYwZC0xNzZiYjAzOWQ4NzUifQ.1YUODLYIoH--rLXLNcm9NmMoI1fS5fCvGPt-ktS4ot4",
+		})
+
+		resp, err := testServer.Client().Do(request)
+		require.NoError(t, err)
+		require.Equal(t, http.StatusCreated, resp.StatusCode)
+
+		defer resp.Body.Close()
+
+		_, err = io.ReadAll(resp.Body)
+		require.NoError(t, err)
+		require.NotEmpty(t, resp.Header.Get("Set-Cookie"))
+
+	})
+
+	t.Run("with_wrong_token_we_receive_401", func(t *testing.T) {
+		body := strings.NewReader(requestBody)
+		request, err := http.NewRequest(http.MethodPost, testServer.URL+"/", body)
+		require.NoError(t, err)
+		request.Header.Set("Content-Type", "text/plain")
+		request.AddCookie(&http.Cookie{
+			Name:  middlewares.AuthCookieName,
+			Value: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJjbGVhcnRocmVlIiwiZXhwIjoxNzQ1MDA1NDI0LCJpYXQiOjE3NDQ2NTk4MjR9.vyxJJPY8CknChfzFIM8maWgZcDIPqvRN6CuNm76bq7Y",
+		})
+
+		resp, err := testServer.Client().Do(request)
+		require.NoError(t, err)
+		require.Equal(t, http.StatusUnauthorized, resp.StatusCode)
+
+		defer resp.Body.Close()
+	})
+	t.Run("some_error_with_token", func(t *testing.T) {
+		body := strings.NewReader(requestBody)
+		request, err := http.NewRequest(http.MethodPost, testServer.URL+"/", body)
+		require.NoError(t, err)
+		request.Header.Set("Content-Type", "text/plain")
+		request.AddCookie(&http.Cookie{
+			Name:  middlewares.AuthCookieName,
+			Value: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJjbGVhcnRocmVlIiwiZXhwIjoxODk0NjU5ODI0LCJpYXQiOjE4OTQ2NTk4MjQsInVzZXJfaWQiOiJkYWNlNGQ2OC0yZjk2LTQzODMtYTYwZC0xNzZiYjAzOWQ4NzUifQ.AFcFQc-LucJrSIirCq4RoAMa9jELOLoWECU53mLhZzY",
+		})
+
+		resp, err := testServer.Client().Do(request)
+		require.NoError(t, err)
+		require.Equal(t, http.StatusInternalServerError, resp.StatusCode)
+
+		defer resp.Body.Close()
+	})
+
+	t.Run("token_is_ok", func(t *testing.T) {
+		body := strings.NewReader(requestBody)
+		request, err := http.NewRequest(http.MethodPost, testServer.URL+"/", body)
+		require.NoError(t, err)
+		request.Header.Set("Content-Type", "text/plain")
+
+		resp, err := testServer.Client().Do(request)
+		require.NoError(t, err)
+		require.Equal(t, http.StatusCreated, resp.StatusCode)
+
+		defer resp.Body.Close()
+
+		_, err = io.ReadAll(resp.Body)
+		require.NoError(t, err)
+		require.NotEmpty(t, resp.Header.Get("Set-Cookie"))
+
+		request, err = http.NewRequest(http.MethodGet, testServer.URL+"/api/user/urls", nil)
+		require.NoError(t, err)
+		token := strings.TrimPrefix(resp.Header.Get("Set-Cookie"), middlewares.AuthCookieName+"=")
+		token = strings.TrimSuffix(token, "; Path=/")
+		require.NotEmpty(t, token)
+		request.AddCookie(&http.Cookie{
+			Name:  middlewares.AuthCookieName,
+			Value: token,
+		})
+		resp, err = testServer.Client().Do(request)
+		require.NoError(t, err)
+		defer resp.Body.Close()
+
+		require.NoError(t, err)
+		require.Equal(t, http.StatusOK, resp.StatusCode)
 	})
 }
