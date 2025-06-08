@@ -3,15 +3,16 @@ package handlers
 import (
 	"encoding/json"
 	"errors"
-	"github.com/clearthree/url-shortener/internal/app/logger"
-	"github.com/clearthree/url-shortener/internal/app/middlewares"
-	"github.com/clearthree/url-shortener/internal/app/models"
-	"github.com/clearthree/url-shortener/internal/app/storage"
 	"io"
 	"net/http"
 	"net/url"
 	"strconv"
 	"strings"
+
+	"github.com/clearthree/url-shortener/internal/app/logger"
+	"github.com/clearthree/url-shortener/internal/app/middlewares"
+	"github.com/clearthree/url-shortener/internal/app/models"
+	"github.com/clearthree/url-shortener/internal/app/storage"
 
 	"github.com/clearthree/url-shortener/internal/app/service"
 )

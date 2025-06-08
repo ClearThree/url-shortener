@@ -4,11 +4,12 @@ import (
 	"bufio"
 	"encoding/json"
 	"errors"
+	"io"
+	"os"
+
 	"github.com/clearthree/url-shortener/internal/app/config"
 	"github.com/clearthree/url-shortener/internal/app/logger"
 	"github.com/clearthree/url-shortener/internal/app/models"
-	"io"
-	"os"
 )
 
 var ErrorFileReadCompletely = errors.New("file has been read completely")

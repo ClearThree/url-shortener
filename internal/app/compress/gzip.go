@@ -25,6 +25,7 @@ func (c *CompressWriter) Header() http.Header {
 
 func (c *CompressWriter) Write(p []byte) (int, error) {
 	if c.ShouldCompress() {
+		c.writer.Header().Set("Content-Encoding", "gzip")
 		return c.gzipWriter.Write(p)
 	}
 	return c.writer.Write(p)

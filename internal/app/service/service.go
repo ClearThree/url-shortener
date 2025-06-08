@@ -3,13 +3,15 @@ package service
 import (
 	"context"
 	"errors"
+	"math/rand"
+	"time"
+
+	"go.uber.org/zap"
+
 	"github.com/clearthree/url-shortener/internal/app/config"
 	"github.com/clearthree/url-shortener/internal/app/logger"
 	"github.com/clearthree/url-shortener/internal/app/models"
 	"github.com/clearthree/url-shortener/internal/app/storage"
-	"go.uber.org/zap"
-	"math/rand"
-	"time"
 )
 
 const letters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"

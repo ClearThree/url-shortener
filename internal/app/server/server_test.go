@@ -3,14 +3,16 @@ package server
 import (
 	"bytes"
 	"compress/gzip"
-	"github.com/clearthree/url-shortener/internal/app/middlewares"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
+	"github.com/clearthree/url-shortener/internal/app/middlewares"
 )
 
 func testRequest(t *testing.T, testServer *httptest.Server, method string, path string, contentType string, payload string) (*http.Response, string) {
