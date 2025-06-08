@@ -307,6 +307,10 @@ func TestDBRepo_BatchCreate(t *testing.T) {
 				pool: db,
 			}
 			mock.ExpectBegin()
+
+			mock.ExpectPrepare("SELECT id FROM users").ExpectQuery().
+				WithArgs(tt.args.userID).WillReturnRows(sqlmock.NewRows([]string{"id"}))
+
 			mock.ExpectPrepare("INSERT INTO users").ExpectExec().
 				WithArgs(tt.args.userID).
 				WillReturnResult(sqlmock.NewResult(1, 1))

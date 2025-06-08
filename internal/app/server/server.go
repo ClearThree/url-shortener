@@ -49,6 +49,8 @@ func ShortenURLRouter(pool *sql.DB, doneChan chan struct{}) chi.Router {
 	router.Delete("/api/user/urls", deleteBatchOfURLsHandler.ServeHTTP)
 	router.Get("/{id}", redirectHandler.ServeHTTP)
 	router.Get("/ping", pingHandler.ServeHTTP)
+
+	router.Mount("/debug", middleware.Profiler())
 	return router
 }
 
@@ -57,10 +59,16 @@ func Run(addr string) error {
 	if config.Settings.DatabaseDSN != "" {
 		var err error
 		Pool, err = sql.Open("pgx", config.Settings.DatabaseDSN)
+		Pool.SetMaxOpenConns(config.Settings.DatabaseMaxConnections)
 		if err != nil {
 			return err
 		}
-		defer Pool.Close()
+		defer func(Pool *sql.DB) {
+			closeErr := Pool.Close()
+			if closeErr != nil {
+				panic(closeErr)
+			}
+		}(Pool)
 		ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
 		defer cancel()
 		if err = Pool.PingContext(ctx); err != nil {
@@ -80,7 +88,12 @@ func Run(addr string) error {
 		if err != nil {
 			return err
 		}
-		defer storage.FSWrapper.Close()
+		defer func(FSWrapper *storage.FileWrapper) {
+			closeErr := FSWrapper.Close()
+			if closeErr != nil {
+				panic(closeErr)
+			}
+		}(storage.FSWrapper)
 	}
 	doneChan := make(chan struct{})
 	logger.Log.Info("Server initiation completed, starting to serve")

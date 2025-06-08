@@ -10,6 +10,8 @@ import (
 	"github.com/clearthree/url-shortener/internal/app/storage"
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
+	"strconv"
+	"strings"
 
 	"testing"
 )
@@ -526,4 +528,69 @@ func TestShortURLService_ReadByUserID(t *testing.T) {
 			assert.Equalf(t, tt.want, got, "ReadByUserID(%v, %v)", tt.args.ctx, tt.args.userID)
 		})
 	}
+}
+
+func BenchmarkShortURLService(b *testing.B) {
+	repo := RepoMock{
+		make(map[string]string),
+		make(map[string][]string),
+		make(map[string]string),
+		make(map[string]bool),
+	}
+	service := NewService(repo, make(chan struct{}))
+	ctx := context.Background()
+	testCaseLength := 10
+	testUserID := "ImagineThisIsTheUUID"
+	URLs := make([]string, testCaseLength)
+	for i := 0; i < testCaseLength; i++ {
+		URLs[i] = "http://yandex" + strconv.Itoa(i) + ".ru"
+	}
+	shortURL, err := service.Create(ctx, URLs[0], testUserID)
+	if err != nil {
+		panic(err)
+	}
+	testID := strings.Split(shortURL, "/")[3]
+
+	b.ResetTimer()
+	b.Run("ReadByUserID", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			_, err := service.ReadByUserID(ctx, testUserID)
+			if err != nil {
+				panic(err)
+			}
+		}
+	})
+	b.Run("Create", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			_, err = service.Create(ctx, "http://ya.ru", testUserID)
+			if err != nil {
+				panic(err)
+			}
+		}
+	})
+	b.Run("Read", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			_, _, err = service.Read(ctx, testID)
+			if err != nil {
+				panic(err)
+			}
+		}
+	})
+	b.Run("BatchCreate", func(b *testing.B) {
+		b.StopTimer()
+		requestData := make([]models.ShortenBatchItemRequest, testCaseLength)
+		for i := 1; i < testCaseLength; i++ {
+			requestData[i] = models.ShortenBatchItemRequest{
+				OriginalURL:   URLs[i],
+				CorrelationID: strconv.Itoa(i),
+			}
+		}
+		b.StartTimer()
+		for i := 0; i < b.N; i++ {
+			_, err = service.BatchCreate(ctx, requestData, testUserID)
+			if err != nil {
+				panic(err)
+			}
+		}
+	})
 }
