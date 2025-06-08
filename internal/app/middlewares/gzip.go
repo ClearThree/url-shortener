@@ -7,6 +7,7 @@ import (
 	"github.com/clearthree/url-shortener/internal/app/compress"
 )
 
+// GzipMiddleware is the middleware function to support gzip-compressed request payload and to compress the response body.
 func GzipMiddleware(next http.Handler) http.Handler {
 	fn := func(writer http.ResponseWriter, request *http.Request) {
 		usedWriter := writer

@@ -9,6 +9,7 @@ import (
 	"github.com/clearthree/url-shortener/internal/app/logger"
 )
 
+// RequestLogger is the middleware function to log all the requests with its duration and response status code.
 func RequestLogger(next http.Handler) http.Handler {
 	fn := func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()

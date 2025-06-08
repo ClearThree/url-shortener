@@ -1,3 +1,8 @@
+// Package handlers stores all the structures that implement handlers.
+// Each handler must be initialized by creating a structure with its constructor-method.
+// All constructor methods accept the required dependencies, which are used later in the handler function.
+// Handler functions ServeHTTP must be implemented to comply the IHandler interface
+// and should be registered in web application.
 package handlers
 
 import (
@@ -17,6 +22,7 @@ import (
 	"github.com/clearthree/url-shortener/internal/app/service"
 )
 
+// maxPayloadSize - is the maximum size of payload that the server can process in the request.
 const maxPayloadSize = 1024 * 1024
 
 func isURL(payload string) bool {
@@ -27,14 +33,27 @@ func isURL(payload string) bool {
 	return parsedURL.Scheme == "https" || parsedURL.Scheme == "http"
 }
 
+// IHandler is the interface for all handler-structures
+type IHandler interface {
+	ServeHTTP(http.ResponseWriter, *http.Request)
+}
+
+// CreateShortURLHandler is a structure to store dependencies and
+// implement ServeHTTP Handler function to create the short URL from the passed URL.
 type CreateShortURLHandler struct {
 	service service.ShortURLServiceInterface
 }
 
+// NewCreateShortURLHandler is a constructor function that returns a pointer
+// to the freshly created CreateShortURLHandler structure.
 func NewCreateShortURLHandler(service service.ShortURLServiceInterface) *CreateShortURLHandler {
 	return &CreateShortURLHandler{service: service}
 }
 
+// ServeHTTP Serves as handler function. Creates a short URL for the passed original URL.
+// Accepts text/plain request body that contains a valid URL.
+// Maximal body size is defined with maxPayloadSize constant.
+// Responds with text/plain body that contains a valid short URL.
 func (create CreateShortURLHandler) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
 	if contentType := request.Header.Get("Content-Type"); !(strings.Contains(contentType, "text/plain") ||
 		strings.Contains(contentType, "application/x-gzip")) {
@@ -94,14 +113,20 @@ func (create CreateShortURLHandler) writeResponse(writer http.ResponseWriter, st
 	}
 }
 
+// RedirectToOriginalURLHandler is a structure to store dependencies and
+// implement ServeHTTP Handler function to redirect the user to the original URL extracted using the passed short URL.
 type RedirectToOriginalURLHandler struct {
 	service service.ShortURLServiceInterface
 }
 
+// NewRedirectToOriginalURLHandler is a constructor function that returns a pointer
+// to the freshly created RedirectToOriginalURLHandler structure.
 func NewRedirectToOriginalURLHandler(service service.ShortURLServiceInterface) *RedirectToOriginalURLHandler {
 	return &RedirectToOriginalURLHandler{service: service}
 }
 
+// ServeHTTP Serves as handler function. Extracts the original URL from the storage using passed short URL,
+// then responds with temporary redirection to the extracted URL.
 func (redirect RedirectToOriginalURLHandler) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
 	id := request.PathValue("id")
 	if id == "" {
@@ -125,14 +150,21 @@ func (redirect RedirectToOriginalURLHandler) ServeHTTP(writer http.ResponseWrite
 	http.Redirect(writer, request, originalURL, http.StatusTemporaryRedirect)
 }
 
+// CreateJSONShortURLHandler is a structure to store dependencies and
+// implement ServeHTTP Handler function to create short URL for the original URL accepted as JSON.
 type CreateJSONShortURLHandler struct {
 	service service.ShortURLServiceInterface
 }
 
+// NewCreateJSONShortURLHandler is a constructor function that returns a pointer
+// to the freshly created CreateJSONShortURLHandler structure.
 func NewCreateJSONShortURLHandler(service service.ShortURLServiceInterface) *CreateJSONShortURLHandler {
 	return &CreateJSONShortURLHandler{service: service}
 }
 
+// ServeHTTP Serves as handler function.
+// Creates the short URL for the passed original URL as a JSON, specified in models.ShortenRequest.
+// Responds with a JSON document, specified in models.ShortenResponse.
 func (create CreateJSONShortURLHandler) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
 	if contentType := request.Header.Get("Content-Type"); !strings.Contains(contentType, "application/json") {
 		http.Error(writer, "Only application/json content type is allowed", http.StatusBadRequest)
@@ -180,14 +212,20 @@ func (create CreateJSONShortURLHandler) writeResponse(writer http.ResponseWriter
 	}
 }
 
+// PingHandler is a structure to store dependencies and
+// implement ServeHTTP Handler function to ping the dependencies of a service.
 type PingHandler struct {
 	service service.ShortURLServiceInterface
 }
 
+// NewPingHandler is a constructor function that returns a pointer
+// to the freshly created PingHandler structure.
 func NewPingHandler(service service.ShortURLServiceInterface) *PingHandler {
 	return &PingHandler{service: service}
 }
 
+// ServeHTTP Serves as handler function.
+// Responds with an error if any of the dependencies is not working as expected.
 func (ping PingHandler) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
 	err := ping.service.Ping(request.Context())
 	if err != nil {
@@ -195,14 +233,21 @@ func (ping PingHandler) ServeHTTP(writer http.ResponseWriter, request *http.Requ
 	}
 }
 
+// BatchCreateShortURLHandler is a structure to store dependencies and
+// implement ServeHTTP Handler function to create the batch of short URLs for the given batch of original URLs.
 type BatchCreateShortURLHandler struct {
 	service service.ShortURLServiceInterface
 }
 
+// NewBatchCreateShortURLHandler is a constructor function that returns a pointer
+// to the freshly created BatchCreateShortURLHandler structure.
 func NewBatchCreateShortURLHandler(service service.ShortURLServiceInterface) *BatchCreateShortURLHandler {
 	return &BatchCreateShortURLHandler{service: service}
 }
 
+// ServeHTTP Serves as handler function.
+// Accepts JSON which is a list of models.ShortenBatchItemRequest objects, creates the short URL for each and
+// responds with a JSON which is a list of models.ShortenBatchItemResponse objects.
 func (create BatchCreateShortURLHandler) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
 	if contentType := request.Header.Get("Content-Type"); !strings.Contains(contentType, "application/json") {
 		http.Error(writer, "Only application/json content type is allowed", http.StatusBadRequest)
@@ -242,14 +287,20 @@ func (create BatchCreateShortURLHandler) ServeHTTP(writer http.ResponseWriter, r
 	}
 }
 
+// GetAllURLsForUserHandler is a structure to store dependencies and
+// implement ServeHTTP Handler function to return all the URLs created by authorized user.
 type GetAllURLsForUserHandler struct {
 	service service.ShortURLServiceInterface
 }
 
+// NewGetAllURLsForUserHandler is a constructor function that returns a pointer
+// to the freshly created GetAllURLsForUserHandler structure.
 func NewGetAllURLsForUserHandler(service service.ShortURLServiceInterface) *GetAllURLsForUserHandler {
 	return &GetAllURLsForUserHandler{service: service}
 }
 
+// ServeHTTP Serves as handler function.
+// Responds with a JSON which is a list of models.ShortURLsByUserResponse objects.
 func (getHandler GetAllURLsForUserHandler) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
 	defer request.Body.Close()
 	userID := request.Header.Get(middlewares.UserIDHeaderName)
@@ -271,14 +322,22 @@ func (getHandler GetAllURLsForUserHandler) ServeHTTP(writer http.ResponseWriter,
 	}
 }
 
+// DeleteBatchOfURLsHandler is a structure to store dependencies and
+// implement ServeHTTP Handler function to return all the URLs created by authorized user.
 type DeleteBatchOfURLsHandler struct {
 	service service.ShortURLServiceInterface
 }
 
+// NewDeleteBatchOfURLsHandler is a constructor function that returns a pointer
+// to the freshly created DeleteBatchOfURLsHandler structure.
 func NewDeleteBatchOfURLsHandler(service service.ShortURLServiceInterface) *DeleteBatchOfURLsHandler {
 	return &DeleteBatchOfURLsHandler{service: service}
 }
 
+// ServeHTTP Serves as handler function.
+// Accepts the JSON-formatted list of short URL IDs, that should be deleted.
+// Schedules the deletion of passed URLs. The URL will be deleted in some time after the response (not instantly).
+// The URL will be deleted if it was created by the same user that tries to delete it.
 func (delete DeleteBatchOfURLsHandler) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
 	if contentType := request.Header.Get("Content-Type"); !strings.Contains(contentType, "application/json") {
 		http.Error(writer, "Only application/json content type is allowed", http.StatusBadRequest)

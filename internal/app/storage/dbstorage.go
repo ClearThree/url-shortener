@@ -14,14 +14,17 @@ import (
 	"github.com/clearthree/url-shortener/internal/app/models"
 )
 
+// DBRepo is the Database-based implementation of Repository interface.
 type DBRepo struct {
 	pool *sql.DB
 }
 
+// NewDBRepo is a constructor for the new DBRepo structure instance.
 func NewDBRepo(pool *sql.DB) *DBRepo {
 	return &DBRepo{pool}
 }
 
+// Create stores the single URL in the database.
 func (D DBRepo) Create(ctx context.Context, id string, originalURL string, userID string) (string, error) {
 	transaction, err := D.pool.Begin()
 	if err != nil {
@@ -78,6 +81,7 @@ func (D DBRepo) Create(ctx context.Context, id string, originalURL string, userI
 	return id, nil
 }
 
+// Read reads the single original URL from the database by its short ID.
 func (D DBRepo) Read(ctx context.Context, id string) (string, bool) {
 	readOriginalURLPreparedStmt, err := D.pool.PrepareContext(ctx, "SELECT original_url, active FROM short_url WHERE short_url = $1")
 	if err != nil {
@@ -94,6 +98,7 @@ func (D DBRepo) Read(ctx context.Context, id string) (string, bool) {
 
 }
 
+// GetShortURLByOriginalURL takes the short URL from the database by the provided original URL.
 func (D DBRepo) GetShortURLByOriginalURL(ctx context.Context, originalURL string) (string, error) {
 	readOriginalURLPreparedStmt, err := D.pool.PrepareContext(ctx, "SELECT short_url FROM short_url WHERE original_url = $1")
 	if err != nil {
@@ -108,10 +113,12 @@ func (D DBRepo) GetShortURLByOriginalURL(ctx context.Context, originalURL string
 	return shortURL, nil
 }
 
+// Ping pings if the database is alive.
 func (D DBRepo) Ping(ctx context.Context) error {
 	return D.pool.PingContext(ctx)
 }
 
+// BatchCreate stores the batch of URLs in the database.
 func (D DBRepo) BatchCreate(ctx context.Context, URLs map[string]models.ShortenBatchItemRequest, userID string) ([]models.ShortenBatchItemResponse, error) {
 	transaction, err := D.pool.Begin()
 	if err != nil {
@@ -171,6 +178,7 @@ func (D DBRepo) BatchCreate(ctx context.Context, URLs map[string]models.ShortenB
 	return results, nil
 }
 
+// ReadByUserID reads all the user-owned URLs from the database.
 func (D DBRepo) ReadByUserID(ctx context.Context, userID string) ([]models.ShortURLsByUserResponse, error) {
 	readURLsByUserIDPreparedStmt, err := D.pool.PrepareContext(
 		ctx, "SELECT short_url, original_url FROM short_url WHERE user_id = $1")
@@ -197,6 +205,7 @@ func (D DBRepo) ReadByUserID(ctx context.Context, userID string) ([]models.Short
 	return results, nil
 }
 
+// GetUserIDByShortURL Reads the user ID of the short URL author from the database.
 func (D DBRepo) GetUserIDByShortURL(ctx context.Context, shortURL string) (string, error) {
 	getUserIDByShortURLPreparedStmt, err := D.pool.PrepareContext(
 		ctx, "SELECT user_id FROM short_url WHERE short_url = $1")
@@ -216,6 +225,7 @@ func (D DBRepo) GetUserIDByShortURL(ctx context.Context, shortURL string) (strin
 
 }
 
+// SetURLsInactive marks the URL as inactive in the database.
 func (D DBRepo) SetURLsInactive(ctx context.Context, shortURLs []string) error {
 	var values []string
 	var args []any

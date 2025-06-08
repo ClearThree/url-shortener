@@ -20,9 +20,11 @@ import (
 	"github.com/clearthree/url-shortener/internal/app/storage"
 )
 
+// Pool is a global connection pool variable.
 var Pool *sql.DB
 var shortURLService service.ShortURLService
 
+// ShortenURLRouter is the function to create the router along with all the business-logic implementations.
 func ShortenURLRouter(pool *sql.DB, doneChan chan struct{}) chi.Router {
 	if pool == nil {
 		shortURLService = service.NewService(storage.MemoryRepo{}, doneChan)
@@ -56,6 +58,7 @@ func ShortenURLRouter(pool *sql.DB, doneChan chan struct{}) chi.Router {
 	return router
 }
 
+// Run is a function that prepares all the infrastructure dependencies and settings and runs the web server.
 func Run(addr string) error {
 	logger.Log.Infof("starting server at %s", addr)
 	if config.Settings.DatabaseDSN != "" {

@@ -8,8 +8,10 @@ import (
 	"github.com/clearthree/url-shortener/internal/app/config"
 )
 
+// Log is the global logger object used for the logging.
 var Log *zap.SugaredLogger
 
+// Initialize is a function that sets up the logger according to the given level.
 func Initialize(level string) error {
 	lvl, err := zap.ParseAtomicLevel(level)
 	if err != nil {

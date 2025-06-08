@@ -1,3 +1,4 @@
+// Package service stores both ShortURLServiceInterface and its main implementation.
 package service
 
 import (
@@ -17,6 +18,8 @@ import (
 const letters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
 const shortURLIdLength = 8
 
+// ErrShortURLNotFound is an error that will be returned in case the non-existing short URL is being requested
+// by the user.
 var ErrShortURLNotFound = errors.New("no urls found by the given id")
 
 func generateID() string {
@@ -27,15 +30,34 @@ func generateID() string {
 	return string(bytesSlice)
 }
 
+// ShortURLServiceInterface is an interface for the business-logic layer of the application.
 type ShortURLServiceInterface interface {
+
+	// Create creates the short URL by passed original URL and connects it with the user.
 	Create(ctx context.Context, originalURL string, userID string) (string, error)
+
+	// Read reads the original URL from the storage by passed ID, which is the ID of short URL.
 	Read(ctx context.Context, id string) (string, bool, error)
+
+	// Ping pings the required dependencies.
 	Ping(ctx context.Context) error
+
+	// BatchCreate creates the batch of short URLs using the batch of original URLs passed by user, connects all the
+	// short URLs with this user.
 	BatchCreate(ctx context.Context, requestData []models.ShortenBatchItemRequest, userID string) ([]models.ShortenBatchItemResponse, error)
+
+	// ReadByUserID Reads all the URLs created by the current user.
 	ReadByUserID(ctx context.Context, userID string) ([]models.ShortURLsByUserResponse, error)
+
+	// ScheduleDeletionOfBatch Schedules the batch of short URLs for the deletion.
 	ScheduleDeletionOfBatch(shortURLs []models.ShortURLChannelMessage)
+
+	// FlushDeletions marks some scheduled deletions as deleted in the storage.
 	FlushDeletions()
 }
+
+// ShortURLService is the structure that implements the ShortURLServiceInterface interface and performs as the main
+// business-logic generalization for the short-url functionality.
 type ShortURLService struct {
 	repo             storage.Repository
 	doneChan         chan struct{}
@@ -43,6 +65,7 @@ type ShortURLService struct {
 	deleteMsgChanOut chan string
 }
 
+// NewService initializes the new ShortURLService structure, using its dependencies as an input.
 func NewService(repo storage.Repository, doneChan chan struct{}) ShortURLService {
 	deleteMsgChanIn := make(chan models.ShortURLChannelMessage, config.Settings.DefaultChannelsBufferSize)
 	deleteMsgChanOut := make(chan string, config.Settings.DefaultChannelsBufferSize)
@@ -51,6 +74,7 @@ func NewService(repo storage.Repository, doneChan chan struct{}) ShortURLService
 	return service
 }
 
+// Create creates the short URL by passed original URL and connects it with the user. Generates the ID before saving to the storage.
 func (s *ShortURLService) Create(ctx context.Context, originalURL string, userID string) (string, error) {
 	var id string
 	for {
@@ -74,6 +98,7 @@ func (s *ShortURLService) Create(ctx context.Context, originalURL string, userID
 	return result, err
 }
 
+// Read reads the original URL from the storage by passed ID, which is the ID of short URL.
 func (s *ShortURLService) Read(ctx context.Context, id string) (string, bool, error) {
 	originalURL, deleted := s.repo.Read(ctx, id)
 	if originalURL == "" {
@@ -82,15 +107,19 @@ func (s *ShortURLService) Read(ctx context.Context, id string) (string, bool, er
 	return originalURL, deleted, nil
 }
 
+// FillRow saves the single row of file (cold-storage) to the storage (warm-storage).
 func (s *ShortURLService) FillRow(ctx context.Context, originalURL string, shortURL string, userID string) error {
 	_, err := s.repo.Create(ctx, shortURL, originalURL, userID)
 	return err
 }
 
+// Ping pings the required dependencies.
 func (s *ShortURLService) Ping(ctx context.Context) error {
 	return s.repo.Ping(ctx)
 }
 
+// BatchCreate creates the batch of short URLs using the batch of original URLs passed by user, connects all the
+// short URLs with this user.
 func (s *ShortURLService) BatchCreate(
 	ctx context.Context, requestData []models.ShortenBatchItemRequest, userID string) ([]models.ShortenBatchItemResponse, error) {
 	URLs := make(map[string]models.ShortenBatchItemRequest)
@@ -113,6 +142,7 @@ func (s *ShortURLService) BatchCreate(
 	return result, nil
 }
 
+// ReadByUserID Reads all the URLs created by the current user.
 func (s *ShortURLService) ReadByUserID(ctx context.Context, userID string) ([]models.ShortURLsByUserResponse, error) {
 	result, err := s.repo.ReadByUserID(ctx, userID)
 	if err != nil {
@@ -125,6 +155,7 @@ func (s *ShortURLService) ReadByUserID(ctx context.Context, userID string) ([]mo
 	return result, err
 }
 
+// FlushDeletions marks some scheduled deletions as deleted in the storage.
 func (s *ShortURLService) FlushDeletions() {
 	ticker := time.NewTicker(time.Duration(config.Settings.DeletionBufferFlushIntervalSeconds) * time.Second)
 
@@ -148,6 +179,7 @@ func (s *ShortURLService) FlushDeletions() {
 	}
 }
 
+// ScheduleDeletionOfBatch Schedules the batch of short URLs for the deletion. Uses FanOut + FanIn.
 func (s *ShortURLService) ScheduleDeletionOfBatch(shortURLs []models.ShortURLChannelMessage) {
 	s.deletionGenerator(shortURLs)
 	channels := s.deletionFanOut()
