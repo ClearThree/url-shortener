@@ -57,7 +57,10 @@ func (D DBRepo) Create(ctx context.Context, id string, originalURL string, userI
 				return "", innerErr
 			}
 			err = NewErrAlreadyExists(ErrAlreadyExists, existingID)
-			transaction.Rollback()
+			txErr := transaction.Rollback()
+			if txErr != nil {
+				return "", txErr
+			}
 			return existingID, err
 		}
 		txErr := transaction.Rollback()
@@ -112,27 +115,43 @@ func (D DBRepo) BatchCreate(ctx context.Context, URLs map[string]models.ShortenB
 	if err != nil {
 		return nil, err
 	}
-	createUserPreparedStmt, err := transaction.PrepareContext(
-		ctx, "INSERT INTO users (id) VALUES ($1)")
+	existingUserPreparedStmt, err := transaction.PrepareContext(ctx,
+		"SELECT id FROM users WHERE id = $1")
 	if err != nil {
 		return nil, err
 	}
-	_, userErr := createUserPreparedStmt.ExecContext(ctx, userID)
-	if userErr != nil {
-		var pgErr *pgconn.PgError
-		if errors.As(userErr, &pgErr) && pgerrcode.IsIntegrityConstraintViolation(pgErr.Code) {
-			logger.Log.Infof("UserID %s already exists", userID)
+	var existingUserID string
+	userRow := existingUserPreparedStmt.QueryRowContext(ctx, userID)
+	if userRow.Err() != nil {
+		return nil, userRow.Err()
+	}
+
+	if err = userRow.Scan(&existingUserID); err != nil {
+		if !errors.Is(err, sql.ErrNoRows) {
+			return nil, err
+		}
+	}
+	if existingUserID == "" {
+		createUserPreparedStmt, prepareErr := transaction.PrepareContext(
+			ctx, "INSERT INTO users (id) VALUES ($1)")
+		if prepareErr != nil {
+			return nil, prepareErr
+		}
+		_, userErr := createUserPreparedStmt.ExecContext(ctx, userID)
+		if userErr != nil {
+			return nil, userErr
 		}
 	}
 
 	createShortURLPreparedStmt, err := transaction.PrepareContext(
-		ctx, "INSERT INTO short_url (short_url, original_url, correlation_id) VALUES ($1, $2, $3)")
+		ctx, "INSERT INTO short_url (short_url, original_url, correlation_id, user_id) VALUES ($1, $2, $3, $4)")
 	if err != nil {
 		return nil, err
 	}
-	results := make([]models.ShortenBatchItemResponse, 0, len(URLs))
+	results := make([]models.ShortenBatchItemResponse, len(URLs))
+	cnt := 0
 	for shortURL, data := range URLs {
-		_, err = createShortURLPreparedStmt.ExecContext(ctx, shortURL, data.OriginalURL, data.CorrelationID)
+		_, err = createShortURLPreparedStmt.ExecContext(ctx, shortURL, data.OriginalURL, data.CorrelationID, userID)
 		if err != nil {
 			txErr := transaction.Rollback()
 			if txErr != nil {
@@ -140,7 +159,8 @@ func (D DBRepo) BatchCreate(ctx context.Context, URLs map[string]models.ShortenB
 			}
 			return nil, err
 		}
-		results = append(results, models.ShortenBatchItemResponse{CorrelationID: data.CorrelationID, ShortURL: shortURL})
+		results[cnt] = models.ShortenBatchItemResponse{CorrelationID: data.CorrelationID, ShortURL: shortURL}
+		cnt++
 	}
 	txErr := transaction.Commit()
 	if txErr != nil {
@@ -164,13 +184,13 @@ func (D DBRepo) ReadByUserID(ctx context.Context, userID string) ([]models.Short
 	}
 	results := make([]models.ShortURLsByUserResponse, 0)
 	for rows.Next() {
-		URL := new(models.ShortURLsByUserResponse)
+		URL := models.ShortURLsByUserResponse{}
 		scanErr := rows.Scan(&URL.ShortURL, &URL.OriginalURL)
 		if scanErr != nil {
 			logger.Log.Error(scanErr.Error())
 			return nil, scanErr
 		}
-		results = append(results, *URL)
+		results = append(results, URL)
 	}
 	return results, nil
 }

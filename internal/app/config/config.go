@@ -15,6 +15,7 @@ type Config struct {
 	LogLevel                           string `env:"LOG_LEVEL" envDefault:"INFO"`
 	FileStoragePath                    string `env:"FILE_STORAGE_PATH"`
 	DatabaseDSN                        string `env:"DATABASE_DSN"`
+	DatabaseMaxConnections             int    `env:"DATABASE_MAX_CONNECTIONS"  envDefault:"99"`
 	SecretKey                          string `env:"SECRET_KEY" envDefault:"DontUseThatInProduction"`
 	JWTExpireHours                     int64  `env:"JWT_EXPIRE_HOURS" envDefault:"96"`
 	DefaultChannelsBufferSize          int64  `env:"DEFAULT_CHANNELS_BUFFER_SIZE" envDefault:"1024"`
