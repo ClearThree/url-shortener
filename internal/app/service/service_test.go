@@ -4,14 +4,16 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strconv"
+	"strings"
+
+	"github.com/golang/mock/gomock"
+	"github.com/stretchr/testify/assert"
+
 	"github.com/clearthree/url-shortener/internal/app/config"
 	"github.com/clearthree/url-shortener/internal/app/mocks"
 	"github.com/clearthree/url-shortener/internal/app/models"
 	"github.com/clearthree/url-shortener/internal/app/storage"
-	"github.com/golang/mock/gomock"
-	"github.com/stretchr/testify/assert"
-	"strconv"
-	"strings"
 
 	"testing"
 )

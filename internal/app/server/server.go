@@ -4,18 +4,20 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"net/http"
+	"time"
+
+	"github.com/go-chi/chi/v5"
+	"github.com/go-chi/chi/v5/middleware"
+	_ "github.com/jackc/pgx/v5/stdlib"
+	"github.com/pressly/goose"
+
 	"github.com/clearthree/url-shortener/internal/app/config"
 	"github.com/clearthree/url-shortener/internal/app/handlers"
 	"github.com/clearthree/url-shortener/internal/app/logger"
 	"github.com/clearthree/url-shortener/internal/app/middlewares"
 	"github.com/clearthree/url-shortener/internal/app/service"
 	"github.com/clearthree/url-shortener/internal/app/storage"
-	"github.com/go-chi/chi/v5"
-	"github.com/go-chi/chi/v5/middleware"
-	_ "github.com/jackc/pgx/v5/stdlib"
-	"github.com/pressly/goose"
-	"net/http"
-	"time"
 )
 
 var Pool *sql.DB

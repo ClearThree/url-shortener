@@ -2,12 +2,14 @@ package middlewares
 
 import (
 	"errors"
-	"github.com/clearthree/url-shortener/internal/app/config"
-	"github.com/clearthree/url-shortener/internal/app/logger"
-	"github.com/golang-jwt/jwt/v4"
-	"github.com/google/uuid"
 	"net/http"
 	"time"
+
+	"github.com/golang-jwt/jwt/v4"
+	"github.com/google/uuid"
+
+	"github.com/clearthree/url-shortener/internal/app/config"
+	"github.com/clearthree/url-shortener/internal/app/logger"
 )
 
 const AuthCookieName = "auth"

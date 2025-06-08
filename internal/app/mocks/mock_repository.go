@@ -8,8 +8,9 @@ import (
 	context "context"
 	reflect "reflect"
 
-	models "github.com/clearthree/url-shortener/internal/app/models"
 	gomock "github.com/golang/mock/gomock"
+
+	models "github.com/clearthree/url-shortener/internal/app/models"
 )
 
 // MockRepository is a mock of Repository interface.

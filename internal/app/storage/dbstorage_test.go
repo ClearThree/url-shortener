@@ -5,13 +5,15 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"testing"
+
 	"github.com/DATA-DOG/go-sqlmock"
-	"github.com/clearthree/url-shortener/internal/app/models"
 	"github.com/jackc/pgerrcode"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"testing"
+
+	"github.com/clearthree/url-shortener/internal/app/models"
 )
 
 func TestDBRepo_Create(t *testing.T) {

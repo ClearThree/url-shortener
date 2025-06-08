@@ -5,11 +5,13 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"github.com/clearthree/url-shortener/internal/app/logger"
-	"github.com/clearthree/url-shortener/internal/app/models"
+	"strings"
+
 	"github.com/jackc/pgerrcode"
 	"github.com/jackc/pgx/v5/pgconn"
-	"strings"
+
+	"github.com/clearthree/url-shortener/internal/app/logger"
+	"github.com/clearthree/url-shortener/internal/app/models"
 )
 
 type DBRepo struct {

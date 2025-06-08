@@ -1,9 +1,10 @@
 package middlewares
 
 import (
-	"github.com/clearthree/url-shortener/internal/app/compress"
 	"net/http"
 	"strings"
+
+	"github.com/clearthree/url-shortener/internal/app/compress"
 )
 
 func GzipMiddleware(next http.Handler) http.Handler {
@@ -16,7 +17,12 @@ func GzipMiddleware(next http.Handler) http.Handler {
 			compressWriter := compress.NewCompressWriter(writer)
 			usedWriter = compressWriter
 
-			defer compressWriter.Close()
+			defer func(compressWriter *compress.CompressWriter) {
+				err := compressWriter.Close()
+				if err != nil {
+					panic(err)
+				}
+			}(compressWriter)
 		}
 
 		contentEncoding := request.Header.Get("Content-Encoding")
@@ -28,7 +34,12 @@ func GzipMiddleware(next http.Handler) http.Handler {
 				return
 			}
 			request.Body = compressReader
-			defer compressReader.Close()
+			defer func(compressReader *compress.CompressReader) {
+				closeErr := compressReader.Close()
+				if closeErr != nil {
+					panic(closeErr)
+				}
+			}(compressReader)
 		}
 
 		next.ServeHTTP(usedWriter, request)

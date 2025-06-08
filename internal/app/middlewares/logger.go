@@ -1,10 +1,12 @@
 package middlewares
 
 import (
-	"github.com/clearthree/url-shortener/internal/app/logger"
-	"github.com/go-chi/chi/v5/middleware"
 	"net/http"
 	"time"
+
+	"github.com/go-chi/chi/v5/middleware"
+
+	"github.com/clearthree/url-shortener/internal/app/logger"
 )
 
 func RequestLogger(next http.Handler) http.Handler {
