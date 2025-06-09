@@ -2,10 +2,12 @@ package main
 
 import (
 	"fmt"
+	"log"
+
 	"github.com/caarlos0/env/v6"
+
 	"github.com/clearthree/url-shortener/internal/app/config"
 	"github.com/clearthree/url-shortener/internal/app/server"
-	"log"
 )
 
 func main() {

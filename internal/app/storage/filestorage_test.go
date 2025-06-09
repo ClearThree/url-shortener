@@ -3,11 +3,13 @@ package storage
 import (
 	"bufio"
 	"bytes"
-	"github.com/clearthree/url-shortener/internal/app/models"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 	"os"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
+	"github.com/clearthree/url-shortener/internal/app/models"
 )
 
 func TestFileWrapper_Close(t *testing.T) {

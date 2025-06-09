@@ -3,10 +3,12 @@ package storage
 import (
 	"context"
 	"fmt"
-	"github.com/clearthree/url-shortener/internal/app/models"
+	"testing"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"testing"
+
+	"github.com/clearthree/url-shortener/internal/app/models"
 )
 
 func TestMemoryRepo_Create(t *testing.T) {

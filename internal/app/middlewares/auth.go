@@ -1,33 +1,44 @@
+// Package middlewares contains all the custom middlewares that are used in the project.
 package middlewares
 
 import (
 	"errors"
-	"github.com/clearthree/url-shortener/internal/app/config"
-	"github.com/clearthree/url-shortener/internal/app/logger"
-	"github.com/golang-jwt/jwt/v4"
-	"github.com/google/uuid"
 	"net/http"
 	"time"
+
+	"github.com/golang-jwt/jwt/v4"
+	"github.com/google/uuid"
+
+	"github.com/clearthree/url-shortener/internal/app/config"
+	"github.com/clearthree/url-shortener/internal/app/logger"
 )
 
-const AuthCookieName = "auth"
-const UserIDHeaderName = "x-user-id"
+// Constants used for the authorization purposes.
+const (
+	AuthCookieName   = "auth"      // The name of the cookie to store an auth-token.
+	UserIDHeaderName = "x-user-id" // The name of the header to store the decoded userID from the token.
+)
 
-var ErrWrongAlgorithm = errors.New("unexpected signing method")
-var ErrTokenIsNotValid = errors.New("invalid token passed")
+// Errors that might occur in the Auth middleware.
+var (
+	ErrWrongAlgorithm  = errors.New("unexpected signing method")
+	ErrTokenIsNotValid = errors.New("invalid token passed")
+)
 
-type Claims struct {
+type claims struct {
 	jwt.RegisteredClaims
 	UserID string `json:"user_id"`
 }
 
+// GenerateJWTString generates the JWT token for the given userID.
+// Might generate the userID itself, if not passed from above.
 func GenerateJWTString(userID string) (string, string, error) {
 	if userID == "" {
 		userID = uuid.New().String()
 	}
 	issueTime := time.Now()
 	expireTime := issueTime.Add(time.Hour * time.Duration(config.Settings.JWTExpireHours))
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, Claims{
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims{
 		RegisteredClaims: jwt.RegisteredClaims{
 			Issuer:    "clearthree",
 			IssuedAt:  jwt.NewNumericDate(issueTime),
@@ -43,9 +54,11 @@ func GenerateJWTString(userID string) (string, string, error) {
 	return tokenString, userID, nil
 }
 
+// GetUserID returns the userID, extracted from the token passed as an input.
+// If not valid, returns the corresponding error.
 func GetUserID(tokenString string) (string, error) {
-	claims := &Claims{}
-	token, err := jwt.ParseWithClaims(tokenString, claims,
+	claimsObj := &claims{}
+	token, err := jwt.ParseWithClaims(tokenString, claimsObj,
 		func(t *jwt.Token) (interface{}, error) {
 			if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
 				logger.Log.Warnf("unexpected signing method: %v", t.Header["alg"])
@@ -55,7 +68,7 @@ func GetUserID(tokenString string) (string, error) {
 		})
 	if err != nil {
 		if errors.Is(err, jwt.ErrTokenExpired) {
-			return claims.UserID, err
+			return claimsObj.UserID, err
 		}
 		return "", err
 	}
@@ -65,9 +78,11 @@ func GetUserID(tokenString string) (string, error) {
 		return "", ErrTokenIsNotValid
 	}
 
-	return claims.UserID, nil
+	return claimsObj.UserID, nil
 }
 
+// AuthMiddleware is the middleware function itself, that tries to extract the token from the request cookies,
+// authorizes it and saves the userID to request headers. If not passed, generates one in advance.
 func AuthMiddleware(next http.Handler) http.Handler {
 	fn := func(writer http.ResponseWriter, request *http.Request) {
 		token, err := request.Cookie(AuthCookieName)

@@ -4,20 +4,22 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"github.com/clearthree/url-shortener/internal/app/config"
-	"github.com/clearthree/url-shortener/internal/app/mocks"
-	"github.com/clearthree/url-shortener/internal/app/models"
-	"github.com/clearthree/url-shortener/internal/app/service"
-	"github.com/clearthree/url-shortener/internal/app/storage"
-	"github.com/golang/mock/gomock"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"strconv"
 	"strings"
 	"testing"
+
+	"github.com/golang/mock/gomock"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
+	"github.com/clearthree/url-shortener/internal/app/config"
+	"github.com/clearthree/url-shortener/internal/app/mocks"
+	"github.com/clearthree/url-shortener/internal/app/models"
+	"github.com/clearthree/url-shortener/internal/app/service"
+	"github.com/clearthree/url-shortener/internal/app/storage"
 )
 
 var ServiceForTest = service.NewService(storage.MemoryRepo{}, make(chan struct{}))
