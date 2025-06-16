@@ -5,13 +5,15 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"testing"
+
 	"github.com/DATA-DOG/go-sqlmock"
-	"github.com/clearthree/url-shortener/internal/app/models"
 	"github.com/jackc/pgerrcode"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"testing"
+
+	"github.com/clearthree/url-shortener/internal/app/models"
 )
 
 func TestDBRepo_Create(t *testing.T) {
@@ -307,6 +309,10 @@ func TestDBRepo_BatchCreate(t *testing.T) {
 				pool: db,
 			}
 			mock.ExpectBegin()
+
+			mock.ExpectPrepare("SELECT id FROM users").ExpectQuery().
+				WithArgs(tt.args.userID).WillReturnRows(sqlmock.NewRows([]string{"id"}))
+
 			mock.ExpectPrepare("INSERT INTO users").ExpectExec().
 				WithArgs(tt.args.userID).
 				WillReturnResult(sqlmock.NewResult(1, 1))
