@@ -1,3 +1,4 @@
+// Package config contains project configuration utils.
 package config
 
 import (
@@ -16,8 +17,8 @@ type Config struct {
 	LogLevel                           string `env:"LOG_LEVEL" envDefault:"INFO"`
 	FileStoragePath                    string `env:"FILE_STORAGE_PATH"`
 	DatabaseDSN                        string `env:"DATABASE_DSN"`
-	DatabaseMaxConnections             int    `env:"DATABASE_MAX_CONNECTIONS"  envDefault:"99"`
 	SecretKey                          string `env:"SECRET_KEY" envDefault:"DontUseThatInProduction"`
+	DatabaseMaxConnections             int    `env:"DATABASE_MAX_CONNECTIONS"  envDefault:"99"`
 	JWTExpireHours                     int64  `env:"JWT_EXPIRE_HOURS" envDefault:"96"`
 	DefaultChannelsBufferSize          int64  `env:"DEFAULT_CHANNELS_BUFFER_SIZE" envDefault:"1024"`
 	DeletionBufferFlushIntervalSeconds int64  `env:"DELETION_BUFFER_FLUSH_INTERVAL_SECONDS" envDefault:"10"`
@@ -45,10 +46,10 @@ func NewConfigFromArgs(argsConfig ArgsConfig) Config {
 
 // ArgsConfig is a structure that generalizes all the command line arguments.
 type ArgsConfig struct {
-	Address         NetAddress
-	HostedOn        HTTPAddress
 	FileStoragePath FileStoragePath
 	DatabaseDSN     DatabaseDSN
+	HostedOn        HTTPAddress
+	Address         NetAddress
 }
 
 var argsConfig ArgsConfig

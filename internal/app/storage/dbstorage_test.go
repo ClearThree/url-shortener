@@ -24,10 +24,10 @@ func TestDBRepo_Create(t *testing.T) {
 		userID      string
 	}
 	tests := []struct {
-		name    string
-		args    args
-		want    string
 		wantErr assert.ErrorAssertionFunc
+		args    args
+		name    string
+		want    string
 	}{
 		{
 			name: "success",
@@ -75,10 +75,10 @@ func TestDBRepo_CreateAlreadyExists(t *testing.T) {
 		errorCode   string
 	}
 	tests := []struct {
-		name              string
-		args              args
-		want              string
 		wantErr           assert.ErrorAssertionFunc
+		args              args
+		name              string
+		want              string
 		shouldBeCustomErr bool
 	}{
 		{
@@ -144,9 +144,9 @@ func TestDBRepo_Ping(t *testing.T) {
 		ctx context.Context
 	}
 	tests := []struct {
-		name      string
 		args      args
 		wantErr   assert.ErrorAssertionFunc
+		name      string
 		returnErr bool
 	}{
 		{
@@ -237,9 +237,9 @@ func TestNewDBRepo(t *testing.T) {
 		pool *sql.DB
 	}
 	tests := []struct {
-		name string
 		args args
 		want *DBRepo
+		name string
 	}{
 		{
 			name: "success",
@@ -265,10 +265,10 @@ func TestDBRepo_BatchCreate(t *testing.T) {
 		userID string
 	}
 	tests := []struct {
-		name    string
-		args    args
-		want    []models.ShortenBatchItemResponse
 		wantErr assert.ErrorAssertionFunc
+		args    args
+		name    string
+		want    []models.ShortenBatchItemResponse
 	}{
 		{
 			name: "Successful batch create",
@@ -383,10 +383,10 @@ func TestDBRepo_ReadByUserID(t *testing.T) {
 		userID string
 	}
 	tests := []struct {
-		name    string
-		args    args
-		want    []models.ShortURLsByUserResponse
 		wantErr assert.ErrorAssertionFunc
+		args    args
+		name    string
+		want    []models.ShortURLsByUserResponse
 	}{
 		{
 			name: "Successful batch read",

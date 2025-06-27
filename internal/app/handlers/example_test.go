@@ -1,10 +1,12 @@
 package handlers
 
 import (
+	"net/http"
+
+	"github.com/go-chi/chi/v5"
+
 	"github.com/clearthree/url-shortener/internal/app/service"
 	"github.com/clearthree/url-shortener/internal/app/storage"
-	"github.com/go-chi/chi/v5"
-	"net/http"
 )
 
 func Example() {

@@ -17,10 +17,10 @@ var ErrorFileReadCompletely = errors.New("file has been read completely")
 
 // FileRow is a structure that represents the columns of a single object in the file.
 type FileRow struct {
-	UUID        int32  `json:"uuid"`
 	ShortURL    string `json:"short_url"`
 	OriginalURL string `json:"original_url"`
 	UserID      string `json:"user_id"`
+	UUID        int32  `json:"uuid"`
 }
 
 // FileWrapper is a structure that wraps all objects required for the file reading and writing.
