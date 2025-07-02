@@ -1,3 +1,4 @@
+// Package models contains all the models used for json (de)serialization in handlers.
 package models
 
 import "context"

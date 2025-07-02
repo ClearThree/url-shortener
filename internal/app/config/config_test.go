@@ -19,8 +19,8 @@ func TestHttpAddress_Set(t *testing.T) {
 	}
 	tests := []struct {
 		name    string
-		fields  fields
 		args    args
+		fields  fields
 		wantErr bool
 	}{
 		{
@@ -110,8 +110,8 @@ func TestHttpAddress_String(t *testing.T) {
 	}
 	tests := []struct {
 		name   string
-		fields fields
 		want   string
+		fields fields
 	}{
 		{
 			name: "craft http address string success",
@@ -154,8 +154,8 @@ func TestNetAddress_Set(t *testing.T) {
 	}
 	tests := []struct {
 		name    string
-		fields  fields
 		args    args
+		fields  fields
 		wantErr bool
 	}{
 		{
@@ -223,8 +223,8 @@ func TestNetAddress_String(t *testing.T) {
 	}
 	tests := []struct {
 		name   string
-		fields fields
 		want   string
+		fields fields
 	}{
 		{
 			name: "craft http address string success",
@@ -256,9 +256,9 @@ func TestNetAddress_String(t *testing.T) {
 
 func TestParseFlags(t *testing.T) {
 	test := struct {
-		flags           []string
 		wantAddress     string
 		wantBaseAddress string
+		flags           []string
 	}{
 		flags: []string{
 			"lel", "-a=localhost:8083", "-b=http://localhost:8083",
@@ -273,9 +273,6 @@ func TestParseFlags(t *testing.T) {
 }
 
 func TestFileStoragePath_Set(t *testing.T) {
-	type fields struct {
-		Path string
-	}
 	type args struct {
 		s string
 	}

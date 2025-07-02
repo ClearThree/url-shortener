@@ -103,9 +103,9 @@ func TestMemoryRepo_Ping(t *testing.T) {
 		in0 context.Context
 	}
 	tests := []struct {
-		name    string
 		args    args
 		wantErr assert.ErrorAssertionFunc
+		name    string
 	}{
 		{
 			name: "Successful ping",

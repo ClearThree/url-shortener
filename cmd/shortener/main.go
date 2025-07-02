@@ -10,7 +10,16 @@ import (
 	"github.com/clearthree/url-shortener/internal/app/server"
 )
 
+var (
+	buildVersion string = "N/A"
+	buildCommit  string = "N/A"
+	buildDate    string = "N/A"
+)
+
 func main() {
+	log.Printf("Build version: %s", buildVersion)
+	log.Printf("Build date: %s", buildDate)
+	log.Printf("Build commit: %s", buildCommit)
 	config.ParseFlags()
 	err := env.Parse(&config.Settings)
 	if err != nil {

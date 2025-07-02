@@ -108,9 +108,9 @@ func TestNewService(t *testing.T) {
 		doneChan chan struct{}
 	}
 	tests := []struct {
-		name string
-		args args
 		want ShortURLService
+		args args
+		name string
 	}{
 		{
 			name: "Successful creation of service",
@@ -263,11 +263,11 @@ func TestShortURLService_Read(t *testing.T) {
 		id  string
 	}
 	tests := []struct {
-		name    string
 		fields  fields
-		args    args
-		want    string
 		wantErr error
+		args    args
+		name    string
+		want    string
 	}{
 		{
 			name: "Successful read of short URL",
@@ -392,14 +392,14 @@ func Test_generateID(t *testing.T) {
 func TestShortURLService_BatchCreate(t *testing.T) {
 	type args struct {
 		ctx         context.Context
-		requestData []models.ShortenBatchItemRequest
 		userID      string
+		requestData []models.ShortenBatchItemRequest
 	}
 	tests := []struct {
-		name    string
-		args    args
-		want    []models.ShortenBatchItemResponse
 		wantErr assert.ErrorAssertionFunc
+		args    args
+		name    string
+		want    []models.ShortenBatchItemResponse
 	}{
 		{
 			name: "Successful batch creation",
@@ -466,11 +466,11 @@ func TestShortURLService_ReadByUserID(t *testing.T) {
 		userID string
 	}
 	tests := []struct {
-		name        string
+		wantErr     assert.ErrorAssertionFunc
 		args        args
+		name        string
 		want        []models.ShortURLsByUserResponse
 		mockReturns []models.ShortURLsByUserResponse
-		wantErr     assert.ErrorAssertionFunc
 	}{
 		{
 			name: "Successful read",
@@ -556,9 +556,9 @@ func BenchmarkShortURLService(b *testing.B) {
 	b.ResetTimer()
 	b.Run("ReadByUserID", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
-			_, err := service.ReadByUserID(ctx, testUserID)
-			if err != nil {
-				panic(err)
+			_, innerErr := service.ReadByUserID(ctx, testUserID)
+			if innerErr != nil {
+				panic(innerErr)
 			}
 		}
 	})

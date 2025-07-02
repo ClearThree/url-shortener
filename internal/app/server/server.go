@@ -1,3 +1,4 @@
+// Package server is the package with all the tools required to run the server
 package server
 
 import (

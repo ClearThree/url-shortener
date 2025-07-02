@@ -29,9 +29,9 @@ func TestNewCreateShortURLHandler(t *testing.T) {
 		service service.ShortURLServiceInterface
 	}
 	tests := []struct {
-		name string
 		args args
 		want *CreateShortURLHandler
+		name string
 	}{
 		{
 			name: "success",
@@ -50,20 +50,20 @@ func TestNewCreateShortURLHandler(t *testing.T) {
 
 func TestCreateShortURLHandler(t *testing.T) {
 	type want struct {
-		code        int
 		response    string
 		contentType string
+		code        int
 	}
 	tests := []struct {
+		mockReturnsError     error
 		name                 string
 		requestPayload       string
 		requestMethod        string
 		requestContentType   string
 		requestContentLength string
 		mockReturns          string
-		mockReturnsError     error
-		mockExpect           bool
 		want                 want
+		mockExpect           bool
 	}{
 		{
 			name:                 "Successful short url creation test",
@@ -238,9 +238,9 @@ func TestNewRedirectToOriginalURLHandler(t *testing.T) {
 		service service.ShortURLServiceInterface
 	}
 	tests := []struct {
-		name string
 		args args
 		want *RedirectToOriginalURLHandler
+		name string
 	}{
 		{
 			name: "success",
@@ -259,9 +259,9 @@ func TestNewRedirectToOriginalURLHandler(t *testing.T) {
 
 func TestRedirectToOriginalURLHandler(t *testing.T) {
 	type want struct {
-		code     int
 		response string
 		header   string
+		code     int
 	}
 	tests := []struct {
 		name          string
@@ -327,9 +327,9 @@ func TestNewCreateJSONShortURLHandler(t *testing.T) {
 		service service.ShortURLServiceInterface
 	}
 	tests := []struct {
-		name string
 		args args
 		want *CreateJSONShortURLHandler
+		name string
 	}{
 		{
 			name: "success",
@@ -348,16 +348,16 @@ func TestNewCreateJSONShortURLHandler(t *testing.T) {
 
 func TestCreateJSONShortURLHandler_ServeHTTP(t *testing.T) {
 	type want struct {
-		code        int
 		contentType string
 		errMessage  string
+		code        int
 	}
 	tests := []struct {
 		name               string
 		requestPayload     string
 		requestContentType string
-		mockExpect         bool
 		want               want
+		mockExpect         bool
 	}{
 		{
 			name:               "Successful creation of the short URL",
@@ -432,9 +432,9 @@ func TestNewPingHandler(t *testing.T) {
 		service service.ShortURLServiceInterface
 	}
 	tests := []struct {
-		name string
 		args args
 		want *PingHandler
+		name string
 	}{
 		{
 			name: "success",
@@ -453,13 +453,13 @@ func TestNewPingHandler(t *testing.T) {
 
 func TestPingHandler_ServeHTTP(t *testing.T) {
 	type want struct {
-		code       int
 		errMessage string
+		code       int
 	}
 	tests := []struct {
 		name        string
-		wantSuccess bool
 		want        want
+		wantSuccess bool
 	}{
 		{
 			name:        "Successful ping",
@@ -510,9 +510,9 @@ func TestNewBatchCreateShortURLHandler(t *testing.T) {
 		service service.ShortURLServiceInterface
 	}
 	tests := []struct {
-		name string
 		args args
 		want *BatchCreateShortURLHandler
+		name string
 	}{
 		{
 			name: "success",
@@ -533,17 +533,17 @@ func TestNewBatchCreateShortURLHandler(t *testing.T) {
 
 func TestBatchCreateShortURLHandler_ServeHTTP(t *testing.T) {
 	type want struct {
-		code        int
 		contentType string
-		payload     []models.ShortenBatchItemResponse
 		errMessage  string
+		payload     []models.ShortenBatchItemResponse
+		code        int
 	}
 	tests := []struct {
 		name               string
 		requestPayload     string
 		requestContentType string
-		mockExpect         bool
 		want               want
+		mockExpect         bool
 	}{
 		{
 			name: "Successful creation of batch for short url",
@@ -658,9 +658,9 @@ func TestNewGetAllURLsForUserHandler(t *testing.T) {
 		service service.ShortURLServiceInterface
 	}
 	tests := []struct {
-		name string
 		args args
 		want *GetAllURLsForUserHandler
+		name string
 	}{
 		{
 			name: "Successful creation of all URLs for user handler",
@@ -681,14 +681,14 @@ func TestNewGetAllURLsForUserHandler(t *testing.T) {
 
 func TestGetAllURLsForUserHandler_ServeHTTP(t *testing.T) {
 	type want struct {
-		code        int
 		contentType string
 		payload     []models.ShortURLsByUserResponse
+		code        int
 	}
 	tests := []struct {
 		name      string
-		want      want
 		mockValue []models.ShortURLsByUserResponse
+		want      want
 	}{
 		{
 			name: "Successful return of all URLs for the user",

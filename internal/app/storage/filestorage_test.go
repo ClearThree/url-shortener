@@ -171,10 +171,10 @@ func TestFileWrapper_ReadNextLine(t *testing.T) {
 		lastUUID int32
 	}
 	tests := []struct {
-		name    string
-		fields  fields
-		want    *FileRow
 		wantErr error
+		want    *FileRow
+		fields  fields
+		name    string
 	}{
 		{
 			name: "success",
