@@ -103,6 +103,10 @@ func Run(addr string) error {
 	}
 	doneChan := make(chan struct{})
 	logger.Log.Info("Server initiation completed, starting to serve")
+	if config.Settings.TLSEnabled {
+		return http.ListenAndServeTLS(
+			addr, config.Settings.CertPath, config.Settings.KeyPath, ShortenURLRouter(Pool, doneChan))
+	}
 	return http.ListenAndServe(addr, ShortenURLRouter(Pool, doneChan))
 }
 

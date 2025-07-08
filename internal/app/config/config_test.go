@@ -1,6 +1,7 @@
 package config
 
 import (
+	"fmt"
 	"os"
 	"testing"
 
@@ -320,6 +321,44 @@ func TestFileStoragePath_String(t *testing.T) {
 				Path: tt.fields.Path,
 			}
 			assert.Equalf(t, tt.want, f.String(), "String()")
+		})
+	}
+}
+
+func TestGetOrCreateCertAndKey(t *testing.T) {
+	tests := []struct {
+		wantErr assert.ErrorAssertionFunc
+		name    string
+		exist   bool
+	}{
+		{
+			name:    "get file - no files exist",
+			exist:   false,
+			wantErr: assert.NoError,
+		},
+		{
+			name:    "get file - files exist",
+			exist:   true,
+			wantErr: assert.NoError,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.exist {
+				Settings.CertPath = "./cert.pem"
+				Settings.KeyPath = "./key.pem"
+				_, _, err := generateCertAndKey()
+				assert.NoError(t, err)
+			} else {
+				Settings.CertPath = "./cert_for_test.pem"
+				Settings.KeyPath = "./key_for_test.pem"
+			}
+			got, got1, err := GetOrCreateCertAndKey()
+			if !tt.wantErr(t, err, fmt.Sprintf("GetOrCreateCertAndKey(%t)", tt.exist)) {
+				return
+			}
+			assert.NotNil(t, got, "GetOrCreateCertAndKey()")
+			assert.NotNil(t, got1, "GetOrCreateCertAndKey()")
 		})
 	}
 }

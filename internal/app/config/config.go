@@ -2,12 +2,22 @@
 package config
 
 import (
+	"bytes"
+	"crypto/rand"
+	"crypto/rsa"
+	"crypto/x509"
+	"crypto/x509/pkix"
+	"encoding/pem"
 	"errors"
 	"flag"
 	"fmt"
+	"io"
+	"math/big"
 	"net"
+	"os"
 	"strconv"
 	"strings"
+	"time"
 )
 
 // Config is a structure that contains all the configurations for the application.
@@ -18,16 +28,26 @@ type Config struct {
 	FileStoragePath                    string `env:"FILE_STORAGE_PATH"`
 	DatabaseDSN                        string `env:"DATABASE_DSN"`
 	SecretKey                          string `env:"SECRET_KEY" envDefault:"DontUseThatInProduction"`
+	KeyPath                            string `env:"KEY_PATH" envDefault:"./cert.pem"`
+	CertPath                           string `env:"CERT_PATH" envDefault:"./key.pem"`
 	DatabaseMaxConnections             int    `env:"DATABASE_MAX_CONNECTIONS"  envDefault:"99"`
 	JWTExpireHours                     int64  `env:"JWT_EXPIRE_HOURS" envDefault:"96"`
 	DefaultChannelsBufferSize          int64  `env:"DEFAULT_CHANNELS_BUFFER_SIZE" envDefault:"1024"`
 	DeletionBufferFlushIntervalSeconds int64  `env:"DELETION_BUFFER_FLUSH_INTERVAL_SECONDS" envDefault:"10"`
+	TLSEnabled                         bool   `env:"ENABLE_HTTPS" envDefault:"false"`
 }
 
 // Sanitize fixes HostedOn varible with trailing slash.
 func (cfg *Config) Sanitize() {
 	if !strings.HasSuffix(cfg.HostedOn, "/") {
 		cfg.HostedOn = cfg.HostedOn + "/"
+	}
+
+	if Settings.TLSEnabled {
+		_, _, err := GetOrCreateCertAndKey()
+		if err != nil {
+			os.Exit(1)
+		}
 	}
 }
 
@@ -41,6 +61,7 @@ func NewConfigFromArgs(argsConfig ArgsConfig) Config {
 		HostedOn:        argsConfig.HostedOn.String(),
 		FileStoragePath: argsConfig.FileStoragePath.String(),
 		DatabaseDSN:     argsConfig.DatabaseDSN.String(),
+		TLSEnabled:      argsConfig.TLSEnabled.TLSEnabled,
 	}
 }
 
@@ -50,6 +71,7 @@ type ArgsConfig struct {
 	DatabaseDSN     DatabaseDSN
 	HostedOn        HTTPAddress
 	Address         NetAddress
+	TLSEnabled      TLSEnabled
 }
 
 var argsConfig ArgsConfig
@@ -161,16 +183,38 @@ func (d *DatabaseDSN) Set(flagValue string) error {
 	return nil
 }
 
+// TLSEnabled is a structure that represents the flag of TLS mode for the project.
+// Implements the Value interface.
+type TLSEnabled struct {
+	TLSEnabled bool
+}
+
+// String returns the string representation of the flag.
+func (e *TLSEnabled) String() string {
+	return strconv.FormatBool(e.TLSEnabled)
+}
+
+// Set sets the flag from its string representation.
+func (e *TLSEnabled) Set(flagValue string) error {
+	if flagValue == "" {
+		return errors.New("TLSEnabled flag must not be empty")
+	}
+	e.TLSEnabled = strings.ToLower(flagValue) == "true"
+	return nil
+}
+
 // ParseFlags is the function that parses all the command arguments and stores them in the corresponding structures.
 func ParseFlags() {
 	hostAddr := new(NetAddress)
 	baseAddr := new(HTTPAddress)
 	fileStoragePath := new(FileStoragePath)
 	databaseDSN := new(DatabaseDSN)
+	isTLSEnabled := new(TLSEnabled)
 	flag.Var(hostAddr, "a", "Address to host on host:port")
 	flag.Var(baseAddr, "b", "base URL for resulting short URL (scheme://host:port)")
 	flag.Var(fileStoragePath, "f", "path to file to store short URLs")
 	flag.Var(databaseDSN, "d", "DSN to connect to the database")
+	flag.Var(isTLSEnabled, "s", "TLS is enabled (default: false)")
 	flag.Parse()
 	if hostAddr.Host == "" && hostAddr.Port == 0 {
 		hostAddr.Host = "localhost"
@@ -189,7 +233,115 @@ func ParseFlags() {
 	argsConfig.HostedOn = *baseAddr
 	argsConfig.FileStoragePath = *fileStoragePath
 	argsConfig.DatabaseDSN = *databaseDSN
+	argsConfig.TLSEnabled = *isTLSEnabled
 	Settings = NewConfigFromArgs(argsConfig)
+}
+
+func closeWrapper(file *os.File) {
+	closeErr := file.Close()
+	if closeErr != nil {
+		return
+	}
+}
+
+// GetOrCreateCertAndKey is a function to read existing or generate a pair of pem certificate + private key.
+func GetOrCreateCertAndKey() ([]byte, []byte, error) {
+	certFile, err := os.OpenFile(Settings.CertPath, os.O_RDWR|os.O_CREATE, 0644)
+	defer closeWrapper(certFile)
+	if err != nil {
+		return nil, nil, err
+	}
+	keyFile, err := os.OpenFile(Settings.KeyPath, os.O_RDWR|os.O_CREATE, 0644)
+	defer closeWrapper(keyFile)
+	if err != nil {
+		return nil, nil, err
+	}
+	var certBytes, keyBytes []byte
+	certBytes, err = io.ReadAll(certFile)
+	if err != nil {
+		return nil, nil, err
+	}
+	keyBytes, err = io.ReadAll(keyFile)
+	if err != nil {
+		return nil, nil, err
+	}
+	if len(certBytes) == 0 || len(keyBytes) == 0 {
+		certBytes, keyBytes, err = generateCertAndKey()
+		if err != nil {
+			return nil, nil, err
+		}
+		_, writeErr := certFile.Write(certBytes)
+		if writeErr != nil {
+			return nil, nil, err
+		}
+		_, writeErr = keyFile.Write(keyBytes)
+		if writeErr != nil {
+			return nil, nil, err
+		}
+	}
+	closeErr := certFile.Close()
+	if closeErr != nil {
+		return nil, nil, closeErr
+	}
+	closeErr = keyFile.Close()
+	if closeErr != nil {
+		return nil, nil, closeErr
+	}
+	return certBytes, keyBytes, nil
+}
+
+func generateCertAndKey() ([]byte, []byte, error) {
+	cert := &x509.Certificate{
+		// указываем уникальный номер сертификата
+		SerialNumber: big.NewInt(1337),
+		// заполняем базовую информацию о владельце сертификата
+		Subject: pkix.Name{
+			Organization: []string{"Yandex.Praktikum"},
+			Country:      []string{"RU"},
+		},
+		// разрешаем использование сертификата для 127.0.0.1 и ::1
+		IPAddresses: []net.IP{net.IPv4(127, 0, 0, 1), net.IPv6loopback},
+		// сертификат верен, начиная со времени создания
+		NotBefore: time.Now(),
+		// время жизни сертификата — 10 лет
+		NotAfter:     time.Now().AddDate(10, 0, 0),
+		SubjectKeyId: []byte{1, 2, 3, 4, 6},
+		// устанавливаем использование ключа для цифровой подписи,
+		// а также клиентской и серверной авторизации
+		ExtKeyUsage: []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth, x509.ExtKeyUsageServerAuth},
+		KeyUsage:    x509.KeyUsageDigitalSignature,
+	}
+
+	// создаём новый приватный RSA-ключ длиной 4096 бит
+	privateKey, err := rsa.GenerateKey(rand.Reader, 4096)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	// создаём сертификат x.509
+	certBytes, err := x509.CreateCertificate(rand.Reader, cert, cert, &privateKey.PublicKey, privateKey)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	var certPEM bytes.Buffer
+	err = pem.Encode(&certPEM, &pem.Block{
+		Type:  "CERTIFICATE",
+		Bytes: certBytes,
+	})
+	if err != nil {
+		return nil, nil, err
+	}
+
+	var privateKeyPEM bytes.Buffer
+	err = pem.Encode(&privateKeyPEM, &pem.Block{
+		Type:  "RSA PRIVATE KEY",
+		Bytes: x509.MarshalPKCS1PrivateKey(privateKey),
+	})
+	if err != nil {
+		return nil, nil, err
+	}
+	return certPEM.Bytes(), privateKeyPEM.Bytes(), nil
 }
 
 func init() {
@@ -200,4 +352,6 @@ func init() {
 	Settings.DatabaseDSN = ""
 	Settings.SecretKey = "DontUseThatInProduction" // Ожидается, что настоящий ключ будет передан через env
 	Settings.DeletionBufferFlushIntervalSeconds = 1
+	Settings.KeyPath = "./key.pem"
+	Settings.CertPath = "./cert.pem"
 }
