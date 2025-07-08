@@ -7,11 +7,13 @@ import (
 	"crypto/rsa"
 	"crypto/x509"
 	"crypto/x509/pkix"
+	"encoding/json"
 	"encoding/pem"
 	"errors"
 	"flag"
 	"fmt"
 	"io"
+	"io/fs"
 	"math/big"
 	"net"
 	"os"
@@ -22,19 +24,20 @@ import (
 
 // Config is a structure that contains all the configurations for the application.
 type Config struct {
-	Address                            string `env:"SERVER_ADDRESS"`
-	HostedOn                           string `env:"BASE_URL"`
+	Address                            string `env:"SERVER_ADDRESS" json:"server_address"`
+	HostedOn                           string `env:"BASE_URL" json:"base_url"`
 	LogLevel                           string `env:"LOG_LEVEL" envDefault:"INFO"`
-	FileStoragePath                    string `env:"FILE_STORAGE_PATH"`
-	DatabaseDSN                        string `env:"DATABASE_DSN"`
+	FileStoragePath                    string `env:"FILE_STORAGE_PATH" json:"file_storage_path"`
+	DatabaseDSN                        string `env:"DATABASE_DSN" json:"database_dsn"`
 	SecretKey                          string `env:"SECRET_KEY" envDefault:"DontUseThatInProduction"`
 	KeyPath                            string `env:"KEY_PATH" envDefault:"./cert.pem"`
 	CertPath                           string `env:"CERT_PATH" envDefault:"./key.pem"`
+	ConfigFile                         string `env:"CONFIG"`
 	DatabaseMaxConnections             int    `env:"DATABASE_MAX_CONNECTIONS"  envDefault:"99"`
 	JWTExpireHours                     int64  `env:"JWT_EXPIRE_HOURS" envDefault:"96"`
 	DefaultChannelsBufferSize          int64  `env:"DEFAULT_CHANNELS_BUFFER_SIZE" envDefault:"1024"`
 	DeletionBufferFlushIntervalSeconds int64  `env:"DELETION_BUFFER_FLUSH_INTERVAL_SECONDS" envDefault:"10"`
-	TLSEnabled                         bool   `env:"ENABLE_HTTPS" envDefault:"false"`
+	TLSEnabled                         bool   `env:"ENABLE_HTTPS" envDefault:"false" json:"enable_https"`
 }
 
 // Sanitize fixes HostedOn varible with trailing slash.
@@ -62,6 +65,7 @@ func NewConfigFromArgs(argsConfig ArgsConfig) Config {
 		FileStoragePath: argsConfig.FileStoragePath.String(),
 		DatabaseDSN:     argsConfig.DatabaseDSN.String(),
 		TLSEnabled:      argsConfig.TLSEnabled.TLSEnabled,
+		ConfigFile:      argsConfig.ConfigFile.String(),
 	}
 }
 
@@ -69,6 +73,7 @@ func NewConfigFromArgs(argsConfig ArgsConfig) Config {
 type ArgsConfig struct {
 	FileStoragePath FileStoragePath
 	DatabaseDSN     DatabaseDSN
+	ConfigFile      FileConfig
 	HostedOn        HTTPAddress
 	Address         NetAddress
 	TLSEnabled      TLSEnabled
@@ -195,11 +200,28 @@ func (e *TLSEnabled) String() string {
 }
 
 // Set sets the flag from its string representation.
-func (e *TLSEnabled) Set(flagValue string) error {
+func (e *TLSEnabled) Set(_ string) error {
+	e.TLSEnabled = true
+	return nil
+}
+
+// FileConfig is a structure that represents the path of config file for the project.
+// Implements the Value interface.
+type FileConfig struct {
+	Path string
+}
+
+// String returns the string representation of the path.
+func (f *FileConfig) String() string {
+	return f.Path
+}
+
+// Set sets the path of config file from its string representation.
+func (f *FileConfig) Set(flagValue string) error {
 	if flagValue == "" {
-		return errors.New("TLSEnabled flag must not be empty")
+		return errors.New("file config must not be empty")
 	}
-	e.TLSEnabled = strings.ToLower(flagValue) == "true"
+	f.Path = flagValue
 	return nil
 }
 
@@ -210,30 +232,71 @@ func ParseFlags() {
 	fileStoragePath := new(FileStoragePath)
 	databaseDSN := new(DatabaseDSN)
 	isTLSEnabled := new(TLSEnabled)
+	fileConfig := new(FileConfig)
+
 	flag.Var(hostAddr, "a", "Address to host on host:port")
 	flag.Var(baseAddr, "b", "base URL for resulting short URL (scheme://host:port)")
 	flag.Var(fileStoragePath, "f", "path to file to store short URLs")
 	flag.Var(databaseDSN, "d", "DSN to connect to the database")
 	flag.Var(isTLSEnabled, "s", "TLS is enabled (default: false)")
+	flag.Var(fileConfig, "c", "path to config file")
 	flag.Parse()
-	if hostAddr.Host == "" && hostAddr.Port == 0 {
+	jsonConfig := &Config{}
+	var filePath string
+	if os.Getenv("CONFIG") != "" {
+		filePath = os.Getenv("CONFIG")
+	} else if fileConfig.Path != "" {
+		filePath = fileConfig.Path
+	}
+	err := readJSONConfig(jsonConfig, filePath)
+	if err != nil {
+		os.Exit(1)
+	}
+	if hostAddr.Host == "" && hostAddr.Port == 0 && jsonConfig.Address == "" {
 		hostAddr.Host = "localhost"
 		hostAddr.Port = 8080
+	} else if jsonConfig.Address != "" {
+		setErr := hostAddr.Set(jsonConfig.Address)
+		if setErr != nil {
+			return
+		}
 	}
-	if baseAddr.Host == "" && baseAddr.Port == 0 && baseAddr.Scheme == "" {
+	if baseAddr.Host == "" && baseAddr.Port == 0 && baseAddr.Scheme == "" && jsonConfig.HostedOn == "" {
 		baseAddr.Scheme = "http://"
 		baseAddr.Host = "localhost"
 		baseAddr.Port = 8080
+	} else if jsonConfig.Address != "" {
+		setErr := baseAddr.Set(jsonConfig.HostedOn)
+		if setErr != nil {
+			os.Exit(1)
+		}
 	}
-	if fileStoragePath.Path == "" {
+	if fileStoragePath.Path == "" && jsonConfig.FileStoragePath == "" {
 		fileStoragePath.Path = "./internal/app/storage/storage.json"
+	} else if jsonConfig.FileStoragePath != "" {
+		setErr := fileStoragePath.Set(jsonConfig.FileStoragePath)
+		if setErr != nil {
+			os.Exit(1)
+		}
 	}
-
+	if databaseDSN.DSN == "" && jsonConfig.DatabaseDSN != "" {
+		setErr := databaseDSN.Set(jsonConfig.DatabaseDSN)
+		if setErr != nil {
+			os.Exit(1)
+		}
+	}
+	if jsonConfig.TLSEnabled {
+		setErr := argsConfig.TLSEnabled.Set("true")
+		if setErr != nil {
+			os.Exit(1)
+		}
+	}
 	argsConfig.Address = *hostAddr
 	argsConfig.HostedOn = *baseAddr
 	argsConfig.FileStoragePath = *fileStoragePath
 	argsConfig.DatabaseDSN = *databaseDSN
 	argsConfig.TLSEnabled = *isTLSEnabled
+	argsConfig.ConfigFile = *fileConfig
 	Settings = NewConfigFromArgs(argsConfig)
 }
 
@@ -278,14 +341,6 @@ func GetOrCreateCertAndKey() ([]byte, []byte, error) {
 		if writeErr != nil {
 			return nil, nil, err
 		}
-	}
-	closeErr := certFile.Close()
-	if closeErr != nil {
-		return nil, nil, closeErr
-	}
-	closeErr = keyFile.Close()
-	if closeErr != nil {
-		return nil, nil, closeErr
 	}
 	return certBytes, keyBytes, nil
 }
@@ -342,6 +397,26 @@ func generateCertAndKey() ([]byte, []byte, error) {
 		return nil, nil, err
 	}
 	return certPEM.Bytes(), privateKeyPEM.Bytes(), nil
+}
+
+func readJSONConfig(config *Config, filePath string) error {
+	if filePath == "" {
+		return nil
+	}
+	file, err := os.ReadFile(filePath)
+	if err != nil {
+		if errors.Is(err, fs.ErrNotExist) {
+			return nil
+		}
+		return err
+	}
+	if len(file) == 0 {
+		return nil
+	}
+	if err = json.Unmarshal(file, &config); err != nil {
+		return err
+	}
+	return nil
 }
 
 func init() {

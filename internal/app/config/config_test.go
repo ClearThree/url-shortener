@@ -362,3 +362,58 @@ func TestGetOrCreateCertAndKey(t *testing.T) {
 		})
 	}
 }
+
+func Test_readJSONConfig(t *testing.T) {
+	type args struct {
+		config   *Config
+		filePath string
+	}
+	tests := []struct {
+		wantErr assert.ErrorAssertionFunc
+		want    *Config
+		args    args
+		name    string
+		preload bool
+	}{
+		{
+			name: "read json config success (no file exists)",
+			args: args{
+				config:   &Config{},
+				filePath: "./config.json",
+			},
+			wantErr: assert.NoError,
+			preload: false,
+			want:    &Config{},
+		},
+		{
+			name: "read json config success",
+			args: args{
+				config:   &Config{},
+				filePath: "./config1.json",
+			},
+			wantErr: assert.NoError,
+			preload: true,
+			want: &Config{
+				Address: "localhost:1337",
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.preload {
+				file, err := os.OpenFile(tt.args.filePath, os.O_WRONLY|os.O_CREATE, 0600)
+				defer func(file *os.File) {
+					closeErr := file.Close()
+					if closeErr != nil {
+						assert.FailNow(t, "unexpected error closing file")
+					}
+				}(file)
+				assert.NoError(t, err)
+				_, writeErr := file.WriteString(`{"server_address": "localhost:1337"}`)
+				assert.NoError(t, writeErr)
+			}
+			tt.wantErr(t, readJSONConfig(tt.args.config, tt.args.filePath), fmt.Sprintf("readJSONConfig(%v, %v)", tt.args.config, tt.args.filePath))
+			assert.Equal(t, tt.want, tt.args.config)
+		})
+	}
+}
