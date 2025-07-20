@@ -5,7 +5,11 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"log"
 	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -62,6 +66,9 @@ func ShortenURLRouter(pool *sql.DB, doneChan chan struct{}) chi.Router {
 // Run is a function that prepares all the infrastructure dependencies and settings and runs the web server.
 func Run(addr string) error {
 	logger.Log.Infof("starting server at %s", addr)
+	doneChan := make(chan struct{})
+	sigint := make(chan os.Signal, 1)
+	signal.Notify(sigint, syscall.SIGINT|syscall.SIGTERM|syscall.SIGQUIT)
 	if config.Settings.DatabaseDSN != "" {
 		var err error
 		Pool, err = sql.Open("pgx", config.Settings.DatabaseDSN)
@@ -101,9 +108,34 @@ func Run(addr string) error {
 			}
 		}(storage.FSWrapper)
 	}
-	doneChan := make(chan struct{})
+	server := &http.Server{Addr: addr, Handler: ShortenURLRouter(Pool, doneChan)}
+	go func() {
+		<-sigint
+		logger.Log.Info("shutting down server")
+		if err := server.Shutdown(context.Background()); err != nil {
+			log.Printf("HTTP server Shutdown: %v", err)
+		}
+		close(doneChan)
+	}()
 	logger.Log.Info("Server initiation completed, starting to serve")
-	return http.ListenAndServe(addr, ShortenURLRouter(Pool, doneChan))
+	if config.Settings.TLSEnabled {
+		if err := server.ListenAndServeTLS(config.Settings.CertPath, config.Settings.KeyPath); !errors.Is(err, http.ErrServerClosed) {
+			log.Fatalf("HTTP server ListenAndServe: %v", err)
+		}
+	}
+	if err := server.ListenAndServe(); !errors.Is(err, http.ErrServerClosed) {
+		log.Fatalf("HTTP server ListenAndServe: %v", err)
+	}
+	<-doneChan
+	if Pool != nil {
+		logger.Log.Info("shutting down db pool")
+		err := Pool.Close()
+		if err != nil {
+			return err
+		}
+	}
+	logger.Log.Info("Bye")
+	return nil
 }
 
 func prefillMemory() error {

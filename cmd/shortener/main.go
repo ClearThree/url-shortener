@@ -21,6 +21,7 @@ func main() {
 	log.Printf("Build date: %s", buildDate)
 	log.Printf("Build commit: %s", buildCommit)
 	config.ParseFlags()
+
 	err := env.Parse(&config.Settings)
 	if err != nil {
 		fmt.Println("parsing env variables was not successful: ", err)
