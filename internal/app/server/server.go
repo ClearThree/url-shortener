@@ -68,9 +68,7 @@ func Run(addr string) error {
 	logger.Log.Infof("starting server at %s", addr)
 	doneChan := make(chan struct{})
 	sigint := make(chan os.Signal, 1)
-	signal.Notify(sigint, syscall.SIGINT)
-	signal.Notify(sigint, syscall.SIGTERM)
-	signal.Notify(sigint, syscall.SIGQUIT)
+	signal.Notify(sigint, syscall.SIGINT|syscall.SIGTERM|syscall.SIGQUIT)
 	if config.Settings.DatabaseDSN != "" {
 		var err error
 		Pool, err = sql.Open("pgx", config.Settings.DatabaseDSN)
