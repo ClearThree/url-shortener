@@ -441,3 +441,44 @@ func TestDBRepo_ReadByUserID(t *testing.T) {
 		})
 	}
 }
+
+func TestDBRepo_GetStats(t *testing.T) {
+	tests := []struct {
+		name string
+		want models.ServiceStats
+	}{
+		{
+			name: "success",
+			want: models.ServiceStats{
+				Users: 1337,
+				URLs:  1338,
+			},
+		},
+		{
+			name: "failure",
+			want: models.ServiceStats{
+				Users: 1337,
+				URLs:  1338,
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			db, mock, err := sqlmock.New()
+			require.NoError(t, err)
+			D := DBRepo{
+				pool: db,
+			}
+			var rsUsers, rsUrls *sqlmock.Rows
+			rsUsers = mock.NewRows([]string{"count"}).AddRow(tt.want.Users)
+			rsUrls = mock.NewRows([]string{"count"}).AddRow(tt.want.URLs)
+
+			mock.ExpectPrepare("SELECT count").ExpectQuery().WillReturnRows(rsUsers)
+			mock.ExpectPrepare("SELECT count").ExpectQuery().WillReturnRows(rsUrls)
+			res, err := D.GetStats(context.Background())
+
+			assert.Equal(t, tt.want, res, "GetStats")
+			require.NoError(t, err)
+		})
+	}
+}

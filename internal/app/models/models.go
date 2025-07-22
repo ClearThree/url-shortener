@@ -37,3 +37,9 @@ type ShortURLChannelMessage struct {
 	ShortURL string
 	UserID   string
 }
+
+// ServiceStats is the model of the message that the statistics handler responds with.
+type ServiceStats struct {
+	Users int `json:"users"` // the amount of users in the service
+	URLs  int `json:"urls"`  // the amount of shortened URLs
+}

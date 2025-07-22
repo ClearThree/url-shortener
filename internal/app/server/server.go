@@ -45,6 +45,7 @@ func ShortenURLRouter(pool *sql.DB, doneChan chan struct{}) chi.Router {
 	var batchCreateHandler = handlers.NewBatchCreateShortURLHandler(&shortURLService)
 	var getAllUrlsByUserHandler = handlers.NewGetAllURLsForUserHandler(&shortURLService)
 	var deleteBatchOfURLsHandler = handlers.NewDeleteBatchOfURLsHandler(&shortURLService)
+	var getStatsHandler = handlers.NewGetStatsHandler(&shortURLService)
 
 	router := chi.NewRouter()
 	router.Use(middlewares.RequestLogger)
@@ -58,6 +59,12 @@ func ShortenURLRouter(pool *sql.DB, doneChan chan struct{}) chi.Router {
 	router.Delete("/api/user/urls", deleteBatchOfURLsHandler.ServeHTTP)
 	router.Get("/{id}", redirectHandler.ServeHTTP)
 	router.Get("/ping", pingHandler.ServeHTTP)
+
+	router.Route("/api/internal", func(r chi.Router) {
+		internalRoutesGroup := r.Group(nil)
+		internalRoutesGroup.Use(middlewares.CheckSubnet)
+		internalRoutesGroup.Get("/stats", getStatsHandler.ServeHTTP)
+	})
 
 	router.Mount("/debug", middleware.Profiler())
 	return router

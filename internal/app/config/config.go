@@ -33,14 +33,16 @@ type Config struct {
 	KeyPath                            string `env:"KEY_PATH" envDefault:"./cert.pem"`
 	CertPath                           string `env:"CERT_PATH" envDefault:"./key.pem"`
 	ConfigFile                         string `env:"CONFIG"`
+	TrustedSubnet                      string `env:"TRUSTED_SUBNET" json:"trusted_subnet"`
 	DatabaseMaxConnections             int    `env:"DATABASE_MAX_CONNECTIONS"  envDefault:"99"`
 	JWTExpireHours                     int64  `env:"JWT_EXPIRE_HOURS" envDefault:"96"`
 	DefaultChannelsBufferSize          int64  `env:"DEFAULT_CHANNELS_BUFFER_SIZE" envDefault:"1024"`
 	DeletionBufferFlushIntervalSeconds int64  `env:"DELETION_BUFFER_FLUSH_INTERVAL_SECONDS" envDefault:"10"`
 	TLSEnabled                         bool   `env:"ENABLE_HTTPS" envDefault:"false" json:"enable_https"`
+	UseHeaderForSourceAddress          bool   `env:"USE_HEADER_FOR_SOURCE_ADDRESS" envDefault:"true" json:"use_header_for_source_address"`
 }
 
-// Sanitize fixes HostedOn varible with trailing slash.
+// Sanitize fixes HostedOn variable with trailing slash.
 func (cfg *Config) Sanitize() {
 	if !strings.HasSuffix(cfg.HostedOn, "/") {
 		cfg.HostedOn = cfg.HostedOn + "/"
@@ -66,6 +68,7 @@ func NewConfigFromArgs(argsConfig ArgsConfig) Config {
 		DatabaseDSN:     argsConfig.DatabaseDSN.String(),
 		TLSEnabled:      argsConfig.TLSEnabled.TLSEnabled,
 		ConfigFile:      argsConfig.ConfigFile.String(),
+		TrustedSubnet:   argsConfig.TrustedSubnet.String(),
 	}
 }
 
@@ -74,6 +77,7 @@ type ArgsConfig struct {
 	FileStoragePath FileStoragePath
 	DatabaseDSN     DatabaseDSN
 	ConfigFile      FileConfig
+	TrustedSubnet   TrustedSubnet
 	HostedOn        HTTPAddress
 	Address         NetAddress
 	TLSEnabled      TLSEnabled
@@ -225,6 +229,26 @@ func (f *FileConfig) Set(flagValue string) error {
 	return nil
 }
 
+// TrustedSubnet is a structure that represents the string representation of CIDR to use for access check in internal routers.
+// Implements the Value interface.
+type TrustedSubnet struct {
+	CIDR string
+}
+
+// String returns the string representation of the CIDR.
+func (t *TrustedSubnet) String() string {
+	return t.CIDR
+}
+
+// Set sets the string representation of CIDR to the structure.
+func (t *TrustedSubnet) Set(flagValue string) error {
+	if flagValue == "" {
+		return errors.New("trusted subnet must not be empty")
+	}
+	t.CIDR = flagValue
+	return nil
+}
+
 // ParseFlags is the function that parses all the command arguments and stores them in the corresponding structures.
 func ParseFlags() {
 	hostAddr := new(NetAddress)
@@ -233,6 +257,7 @@ func ParseFlags() {
 	databaseDSN := new(DatabaseDSN)
 	isTLSEnabled := new(TLSEnabled)
 	fileConfig := new(FileConfig)
+	trustedSubnet := new(TrustedSubnet)
 
 	flag.Var(hostAddr, "a", "Address to host on host:port")
 	flag.Var(baseAddr, "b", "base URL for resulting short URL (scheme://host:port)")
@@ -240,6 +265,7 @@ func ParseFlags() {
 	flag.Var(databaseDSN, "d", "DSN to connect to the database")
 	flag.Var(isTLSEnabled, "s", "TLS is enabled (default: false)")
 	flag.Var(fileConfig, "c", "path to config file")
+	flag.Var(trustedSubnet, "t", "trusted subnet to use for access check in internal routers")
 	flag.Parse()
 	jsonConfig := &Config{}
 	var filePath string
@@ -297,6 +323,7 @@ func ParseFlags() {
 	argsConfig.DatabaseDSN = *databaseDSN
 	argsConfig.TLSEnabled = *isTLSEnabled
 	argsConfig.ConfigFile = *fileConfig
+	argsConfig.TrustedSubnet = *trustedSubnet
 	Settings = NewConfigFromArgs(argsConfig)
 }
 
