@@ -66,6 +66,21 @@ func (mr *MockRepositoryMockRecorder) Create(arg0, arg1, arg2, arg3 interface{})
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Create", reflect.TypeOf((*MockRepository)(nil).Create), arg0, arg1, arg2, arg3)
 }
 
+// GetStats mocks base method.
+func (m *MockRepository) GetStats(arg0 context.Context) (models.ServiceStats, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetStats", arg0)
+	ret0, _ := ret[0].(models.ServiceStats)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetStats indicates an expected call of GetStats.
+func (mr *MockRepositoryMockRecorder) GetStats(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetStats", reflect.TypeOf((*MockRepository)(nil).GetStats), arg0)
+}
+
 // GetUserIDByShortURL mocks base method.
 func (m *MockRepository) GetUserIDByShortURL(arg0 context.Context, arg1 string) (string, error) {
 	m.ctrl.T.Helper()

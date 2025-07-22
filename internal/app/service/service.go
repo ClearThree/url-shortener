@@ -54,6 +54,9 @@ type ShortURLServiceInterface interface {
 
 	// FlushDeletions marks some scheduled deletions as deleted in the storage.
 	FlushDeletions()
+
+	// GetStats returns the total number of users and shortened URLs stored in the service
+	GetStats(ctx context.Context) (models.ServiceStats, error)
 }
 
 // ShortURLService is the structure that implements the ShortURLServiceInterface interface and performs as the main
@@ -249,4 +252,13 @@ func (s *ShortURLService) deletionFanIn(channels ...chan string) {
 		}()
 
 	}
+}
+
+// GetStats Returns the number of users and URLs registered in the service.
+func (s *ShortURLService) GetStats(ctx context.Context) (models.ServiceStats, error) {
+	stats, err := s.repo.GetStats(ctx)
+	if err != nil {
+		return models.ServiceStats{}, err
+	}
+	return stats, nil
 }

@@ -72,7 +72,14 @@ func (create CreateShortURLHandler) ServeHTTP(writer http.ResponseWriter, reques
 		http.Error(writer, "Content is too large", http.StatusBadRequest)
 		return
 	}
-	defer request.Body.Close()
+	defer func(Body io.ReadCloser) {
+		err = Body.Close()
+		if err != nil {
+			logger.Log.Warn(err)
+			http.Error(writer, "Body Close", http.StatusInternalServerError)
+			return
+		}
+	}(request.Body)
 	payload, err := io.ReadAll(request.Body)
 	if err != nil {
 		logger.Log.Warn("Couldn't read the request body")
@@ -170,7 +177,13 @@ func (create CreateJSONShortURLHandler) ServeHTTP(writer http.ResponseWriter, re
 		http.Error(writer, "Only application/json content type is allowed", http.StatusBadRequest)
 		return
 	}
-	defer request.Body.Close()
+	defer func(Body io.ReadCloser) {
+		err := Body.Close()
+		if err != nil {
+			http.Error(writer, "Couldn't close body", http.StatusBadRequest)
+			return
+		}
+	}(request.Body)
 
 	var requestData models.ShortenRequest
 	dec := json.NewDecoder(request.Body)
@@ -253,7 +266,14 @@ func (create BatchCreateShortURLHandler) ServeHTTP(writer http.ResponseWriter, r
 		http.Error(writer, "Only application/json content type is allowed", http.StatusBadRequest)
 		return
 	}
-	defer request.Body.Close()
+	defer func(Body io.ReadCloser) {
+		err := Body.Close()
+		if err != nil {
+			logger.Log.Debugf("Error closing body: %s", err)
+			http.Error(writer, "Error closing body", http.StatusInternalServerError)
+			return
+		}
+	}(request.Body)
 
 	var requestData []models.ShortenBatchItemRequest
 	dec := json.NewDecoder(request.Body)
@@ -302,7 +322,13 @@ func NewGetAllURLsForUserHandler(service service.ShortURLServiceInterface) *GetA
 // ServeHTTP Serves as handler function.
 // Responds with a JSON which is a list of models.ShortURLsByUserResponse objects.
 func (getHandler GetAllURLsForUserHandler) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
-	defer request.Body.Close()
+	defer func(Body io.ReadCloser) {
+		err := Body.Close()
+		if err != nil {
+			logger.Log.Debugf("Error closing body: %s", err)
+			http.Error(writer, "Error closing body", http.StatusInternalServerError)
+		}
+	}(request.Body)
 	userID := request.Header.Get(middlewares.UserIDHeaderName)
 	results, err := getHandler.service.ReadByUserID(request.Context(), userID)
 	if err != nil {
@@ -323,7 +349,7 @@ func (getHandler GetAllURLsForUserHandler) ServeHTTP(writer http.ResponseWriter,
 }
 
 // DeleteBatchOfURLsHandler is a structure to store dependencies and
-// implement ServeHTTP Handler function to return all the URLs created by authorized user.
+// implement ServeHTTP Handler function to delete a batch of URLs created by authorized user.
 type DeleteBatchOfURLsHandler struct {
 	service service.ShortURLServiceInterface
 }
@@ -343,7 +369,13 @@ func (delete DeleteBatchOfURLsHandler) ServeHTTP(writer http.ResponseWriter, req
 		http.Error(writer, "Only application/json content type is allowed", http.StatusBadRequest)
 		return
 	}
-	defer request.Body.Close()
+	defer func(Body io.ReadCloser) {
+		err := Body.Close()
+		if err != nil {
+			logger.Log.Errorf("Error encoding response: %s", err)
+			http.Error(writer, "Error encoding response body", http.StatusInternalServerError)
+		}
+	}(request.Body)
 
 	var requestData []string
 	dec := json.NewDecoder(request.Body)
@@ -368,4 +400,35 @@ func (delete DeleteBatchOfURLsHandler) ServeHTTP(writer http.ResponseWriter, req
 	}
 	go delete.service.ScheduleDeletionOfBatch(requestPrepared)
 	writer.WriteHeader(http.StatusAccepted)
+}
+
+// GetStatsHandler is a structure to store dependencies and
+// implement ServeHTTP Handler function to return statistics of created users and short URLs in the service.
+type GetStatsHandler struct {
+	service service.ShortURLServiceInterface
+}
+
+// NewGetStatsHandler is a constructor function that returns a pointer
+// to the freshly created GetStatsHandler structure.
+func NewGetStatsHandler(service service.ShortURLServiceInterface) *GetStatsHandler {
+	return &GetStatsHandler{service: service}
+}
+
+// ServeHTTP Serves as handler function.
+// Returns the JSON, representing the total number of users and short URLs created in the service.
+func (stats GetStatsHandler) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
+	statistic, err := stats.service.GetStats(request.Context())
+	if err != nil {
+		logger.Log.Debugf("Error getting statistics: %s", err)
+		http.Error(writer, "Couldn't get service statistics", http.StatusBadRequest)
+		return
+	}
+	enc := json.NewEncoder(writer)
+	writer.Header().Add("Content-Type", "application/json")
+	writer.WriteHeader(http.StatusOK)
+	if encErr := enc.Encode(statistic); encErr != nil {
+		logger.Log.Debugf("Error encoding response: %s", encErr)
+		http.Error(writer, "Couldn't get service statistics", http.StatusBadRequest)
+		return
+	}
 }

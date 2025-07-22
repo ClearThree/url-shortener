@@ -57,6 +57,9 @@ type Repository interface {
 
 	// SetURLsInactive marks the URL as inactive in the storage.
 	SetURLsInactive(ctx context.Context, shortURLs []string) error
+
+	// GetStats returns the total number of users and shortened URLs stored in the storage
+	GetStats(ctx context.Context) (models.ServiceStats, error)
 }
 
 var memoryStorage map[string]string
@@ -141,6 +144,15 @@ func (m MemoryRepo) SetURLsInactive(_ context.Context, shortURLs []string) error
 		memoryStorageDeactivatedURLs[shortURL] = true
 	}
 	return nil
+}
+
+// GetStats returns the total number of users and shortened URLs stored in the memory
+func (m MemoryRepo) GetStats(_ context.Context) (models.ServiceStats, error) {
+	response := models.ServiceStats{
+		Users: len(memoryIDsStorage),
+		URLs:  len(memoryStorage),
+	}
+	return response, nil
 }
 
 func init() {

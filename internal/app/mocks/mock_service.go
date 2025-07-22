@@ -78,6 +78,21 @@ func (mr *MockShortURLServiceInterfaceMockRecorder) FlushDeletions() *gomock.Cal
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "FlushDeletions", reflect.TypeOf((*MockShortURLServiceInterface)(nil).FlushDeletions))
 }
 
+// GetStats mocks base method.
+func (m *MockShortURLServiceInterface) GetStats(arg0 context.Context) (models.ServiceStats, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetStats", arg0)
+	ret0, _ := ret[0].(models.ServiceStats)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetStats indicates an expected call of GetStats.
+func (mr *MockShortURLServiceInterfaceMockRecorder) GetStats(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetStats", reflect.TypeOf((*MockShortURLServiceInterface)(nil).GetStats), arg0)
+}
+
 // Ping mocks base method.
 func (m *MockShortURLServiceInterface) Ping(arg0 context.Context) error {
 	m.ctrl.T.Helper()

@@ -102,6 +102,14 @@ func (rm RepoMock) SetURLsInactive(_ context.Context, shortURLs []string) error 
 	return nil
 }
 
+func (rm RepoMock) GetStats(_ context.Context) (models.ServiceStats, error) {
+	response := models.ServiceStats{
+		Users: len(rm.localIDsStorage),
+		URLs:  len(rm.localStorage),
+	}
+	return response, nil
+}
+
 func TestNewService(t *testing.T) {
 	type args struct {
 		repo     storage.Repository
@@ -595,4 +603,47 @@ func BenchmarkShortURLService(b *testing.B) {
 			}
 		}
 	})
+}
+
+func TestShortURLService_GetStats(t *testing.T) {
+	type args struct {
+		ctx context.Context
+	}
+	tests := []struct {
+		args    args
+		name    string
+		want    models.ServiceStats
+		wantErr bool
+	}{
+		{
+			name: "Successful read",
+			args: args{
+				ctx: context.Background(),
+			},
+			want: models.ServiceStats{
+				Users: 1337,
+				URLs:  1338,
+			},
+			wantErr: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			defer ctrl.Finish()
+			repoMock := mocks.NewMockRepository(ctrl)
+			s := &ShortURLService{
+				repo: repoMock,
+			}
+			repoMock.EXPECT().
+				GetStats(tt.args.ctx).
+				Return(tt.want, nil)
+			got, err := s.GetStats(tt.args.ctx)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("Create() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			assert.Equal(t, tt.want, got)
+		})
+	}
 }

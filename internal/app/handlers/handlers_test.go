@@ -754,3 +754,75 @@ func TestGetAllURLsForUserHandler_ServeHTTP(t *testing.T) {
 		})
 	}
 }
+
+func TestNewGetStatsHandler(t *testing.T) {
+	type args struct {
+		service service.ShortURLServiceInterface
+	}
+	tests := []struct {
+		name string
+		args args
+		want *GetStatsHandler
+	}{
+		{
+			name: "Successful creation of stats handler",
+			args: args{
+				service: &ServiceForTest,
+			},
+			want: &GetStatsHandler{
+				service: &ServiceForTest,
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equalf(t, tt.want, NewGetStatsHandler(tt.args.service), "NewGetStatsHandler(%v)", tt.args.service)
+		})
+	}
+}
+
+func TestGetStatsHandler_ServeHTTP(t *testing.T) {
+	type want struct {
+		contentType string
+		payload     models.ServiceStats
+		code        int
+	}
+	tests := []struct {
+		name      string
+		mockValue models.ServiceStats
+		want      want
+	}{
+		{
+			name: "Successful get stats",
+			mockValue: models.ServiceStats{
+				Users: 1337,
+				URLs:  1338,
+			},
+			want: want{
+				code:        http.StatusOK,
+				contentType: "application/json",
+				payload: models.ServiceStats{
+					Users: 1337,
+					URLs:  1338,
+				},
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			defer ctrl.Finish()
+			shortURLServiceMock := mocks.NewMockShortURLServiceInterface(ctrl)
+			shortURLServiceMock.EXPECT().
+				GetStats(context.Background()).
+				Return(tt.mockValue, nil)
+			request := httptest.NewRequest(http.MethodGet, "/api/internal/stats", nil)
+			recorder := httptest.NewRecorder()
+			handler := NewGetStatsHandler(shortURLServiceMock)
+			handler.ServeHTTP(recorder, request)
+			res := recorder.Result()
+			assert.Equal(t, tt.want.code, res.StatusCode)
+			defer res.Body.Close()
+		})
+	}
+}

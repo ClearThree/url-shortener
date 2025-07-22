@@ -215,11 +215,36 @@ func TestMemoryRepo_ReadByUserID(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			m := MemoryRepo{}
 			for _, v := range tt.want {
-				m.Create(tt.args.ctx, v.ShortURL, v.OriginalURL, tt.args.userID)
+				_, err := m.Create(tt.args.ctx, v.ShortURL, v.OriginalURL, tt.args.userID)
+				if err != nil {
+					require.NoError(t, err)
+				}
 			}
 			got, err := m.ReadByUserID(tt.args.ctx, tt.args.userID)
 			require.NoError(t, err)
 			assert.Equalf(t, tt.want, got, "ReadByUserID(%v, %v)", tt.args.ctx, tt.args.userID)
+		})
+	}
+}
+
+func TestMemoryRepo_GetStats(t *testing.T) {
+	tests := []struct {
+		wantErr assert.ErrorAssertionFunc
+		name    string
+	}{
+		{
+			name:    "Successful get",
+			wantErr: assert.NoError,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			m := MemoryRepo{}
+			_, err := m.GetStats(context.Background())
+			if !tt.wantErr(t, err, "GetStats") {
+				return
+			}
+
 		})
 	}
 }
