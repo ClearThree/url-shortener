@@ -34,6 +34,8 @@ type Config struct {
 	CertPath                           string `env:"CERT_PATH" envDefault:"./key.pem"`
 	ConfigFile                         string `env:"CONFIG"`
 	TrustedSubnet                      string `env:"TRUSTED_SUBNET" json:"trusted_subnet"`
+	GRPCPort                           string `env:"GRPC_PORT" envDefault:"3200" json:"grpc_port"`
+	GRPCToken                          string `env:"GRPC_TOKEN" json:"grpc_token"`
 	DatabaseMaxConnections             int    `env:"DATABASE_MAX_CONNECTIONS"  envDefault:"99"`
 	JWTExpireHours                     int64  `env:"JWT_EXPIRE_HOURS" envDefault:"96"`
 	DefaultChannelsBufferSize          int64  `env:"DEFAULT_CHANNELS_BUFFER_SIZE" envDefault:"1024"`
@@ -453,6 +455,7 @@ func init() {
 	Settings.FileStoragePath = "./storage.json"
 	Settings.DatabaseDSN = ""
 	Settings.SecretKey = "DontUseThatInProduction" // Ожидается, что настоящий ключ будет передан через env
+	Settings.GRPCToken = "DontUseThatInProduction" // Ожидается, что настоящий ключ будет передан через env
 	Settings.DeletionBufferFlushIntervalSeconds = 1
 	Settings.KeyPath = "./key.pem"
 	Settings.CertPath = "./cert.pem"

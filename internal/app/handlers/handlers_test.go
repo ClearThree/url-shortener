@@ -760,9 +760,9 @@ func TestNewGetStatsHandler(t *testing.T) {
 		service service.ShortURLServiceInterface
 	}
 	tests := []struct {
-		name string
 		args args
 		want *GetStatsHandler
+		name string
 	}{
 		{
 			name: "Successful creation of stats handler",
@@ -789,8 +789,8 @@ func TestGetStatsHandler_ServeHTTP(t *testing.T) {
 	}
 	tests := []struct {
 		name      string
-		mockValue models.ServiceStats
 		want      want
+		mockValue models.ServiceStats
 	}{
 		{
 			name: "Successful get stats",

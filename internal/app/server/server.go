@@ -6,11 +6,15 @@ import (
 	"database/sql"
 	"errors"
 	"log"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
+
+	"github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors/auth"
+	"google.golang.org/grpc"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
@@ -21,6 +25,7 @@ import (
 	"github.com/clearthree/url-shortener/internal/app/handlers"
 	"github.com/clearthree/url-shortener/internal/app/logger"
 	"github.com/clearthree/url-shortener/internal/app/middlewares"
+	"github.com/clearthree/url-shortener/internal/app/server/proto"
 	"github.com/clearthree/url-shortener/internal/app/service"
 	"github.com/clearthree/url-shortener/internal/app/storage"
 )
@@ -30,22 +35,15 @@ var Pool *sql.DB
 var shortURLService service.ShortURLService
 
 // ShortenURLRouter is the function to create the router along with all the business-logic implementations.
-func ShortenURLRouter(pool *sql.DB, doneChan chan struct{}) chi.Router {
-	if pool == nil {
-		shortURLService = service.NewService(storage.MemoryRepo{}, doneChan)
-	} else {
-		shortURLService = service.NewService(storage.NewDBRepo(pool), doneChan)
-	}
-	var shortURLServiceDB = service.NewService(storage.NewDBRepo(pool), doneChan)
-
-	var createHandler = handlers.NewCreateShortURLHandler(&shortURLService)
-	var createJSONShortURLHandler = handlers.NewCreateJSONShortURLHandler(&shortURLService)
-	var redirectHandler = handlers.NewRedirectToOriginalURLHandler(&shortURLService)
-	var pingHandler = handlers.NewPingHandler(&shortURLServiceDB)
-	var batchCreateHandler = handlers.NewBatchCreateShortURLHandler(&shortURLService)
-	var getAllUrlsByUserHandler = handlers.NewGetAllURLsForUserHandler(&shortURLService)
-	var deleteBatchOfURLsHandler = handlers.NewDeleteBatchOfURLsHandler(&shortURLService)
-	var getStatsHandler = handlers.NewGetStatsHandler(&shortURLService)
+func ShortenURLRouter(shortURLService service.ShortURLServiceInterface) chi.Router {
+	var createHandler = handlers.NewCreateShortURLHandler(shortURLService)
+	var createJSONShortURLHandler = handlers.NewCreateJSONShortURLHandler(shortURLService)
+	var redirectHandler = handlers.NewRedirectToOriginalURLHandler(shortURLService)
+	var pingHandler = handlers.NewPingHandler(shortURLService)
+	var batchCreateHandler = handlers.NewBatchCreateShortURLHandler(shortURLService)
+	var getAllUrlsByUserHandler = handlers.NewGetAllURLsForUserHandler(shortURLService)
+	var deleteBatchOfURLsHandler = handlers.NewDeleteBatchOfURLsHandler(shortURLService)
+	var getStatsHandler = handlers.NewGetStatsHandler(shortURLService)
 
 	router := chi.NewRouter()
 	router.Use(middlewares.RequestLogger)
@@ -115,24 +113,44 @@ func Run(addr string) error {
 			}
 		}(storage.FSWrapper)
 	}
-	server := &http.Server{Addr: addr, Handler: ShortenURLRouter(Pool, doneChan)}
+	if Pool == nil {
+		shortURLService = service.NewService(storage.MemoryRepo{}, doneChan)
+	} else {
+		shortURLService = service.NewService(storage.NewDBRepo(Pool), doneChan)
+	}
+	server := &http.Server{Addr: addr, Handler: ShortenURLRouter(&shortURLService)}
+	gRPCServer := grpc.NewServer(grpc.UnaryInterceptor(auth.UnaryServerInterceptor(proto.AuthFn)))
+	gRPCServerListener := proto.NewShortenerGRPCServer(&shortURLService)
 	go func() {
 		<-sigint
-		logger.Log.Info("shutting down server")
+		logger.Log.Info("shutting down HTTP and GRPC servers")
 		if err := server.Shutdown(context.Background()); err != nil {
 			log.Printf("HTTP server Shutdown: %v", err)
 		}
+		gRPCServer.GracefulStop()
 		close(doneChan)
+	}()
+	go func() {
+		listen, err := net.Listen("tcp", ":"+config.Settings.GRPCPort)
+		if err != nil {
+			logger.Log.Fatal(err)
+		}
+		proto.RegisterURLShortenerServiceServer(gRPCServer, gRPCServerListener)
+		logger.Log.Info("gRPC server listening on", listen.Addr())
+		if err = gRPCServer.Serve(listen); err != nil {
+			log.Fatal(err)
+		}
 	}()
 	logger.Log.Info("Server initiation completed, starting to serve")
 	if config.Settings.TLSEnabled {
 		if err := server.ListenAndServeTLS(config.Settings.CertPath, config.Settings.KeyPath); !errors.Is(err, http.ErrServerClosed) {
-			log.Fatalf("HTTP server ListenAndServe: %v", err)
+			logger.Log.Fatalf("HTTP server ListenAndServe: %v", err)
 		}
 	}
 	if err := server.ListenAndServe(); !errors.Is(err, http.ErrServerClosed) {
-		log.Fatalf("HTTP server ListenAndServe: %v", err)
+		logger.Log.Fatalf("HTTP server ListenAndServe: %v", err)
 	}
+
 	<-doneChan
 	if Pool != nil {
 		logger.Log.Info("shutting down db pool")

@@ -25,7 +25,8 @@ import (
 // maxPayloadSize - is the maximum size of payload that the server can process in the request.
 const maxPayloadSize = 1024 * 1024
 
-func isURL(payload string) bool {
+// IsURL Is a helper function that checks if the string is a valid URL
+func IsURL(payload string) bool {
 	parsedURL, err := url.Parse(payload)
 	if err != nil {
 		return false
@@ -92,7 +93,7 @@ func (create CreateShortURLHandler) ServeHTTP(writer http.ResponseWriter, reques
 		return
 	}
 	payloadString := string(payload)
-	if !isURL(payloadString) {
+	if !IsURL(payloadString) {
 		logger.Log.Warnf("Invalid url: %s", payloadString)
 		http.Error(writer, "The provided payload is not a valid URL", http.StatusBadRequest)
 		return
@@ -196,7 +197,7 @@ func (create CreateJSONShortURLHandler) ServeHTTP(writer http.ResponseWriter, re
 		http.Error(writer, "Please provide an url", http.StatusBadRequest)
 		return
 	}
-	if !isURL(requestData.URL) {
+	if !IsURL(requestData.URL) {
 		http.Error(writer, "The provided payload is not a valid URL", http.StatusBadRequest)
 		return
 	}
@@ -287,7 +288,7 @@ func (create BatchCreateShortURLHandler) ServeHTTP(writer http.ResponseWriter, r
 		return
 	}
 	for _, requestItem := range requestData {
-		if !isURL(requestItem.OriginalURL) {
+		if !IsURL(requestItem.OriginalURL) {
 			http.Error(writer, "One of the provided items is not a valid URL", http.StatusBadRequest)
 			return
 		}
