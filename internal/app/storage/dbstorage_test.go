@@ -444,19 +444,19 @@ func TestDBRepo_ReadByUserID(t *testing.T) {
 
 func TestDBRepo_GetStats(t *testing.T) {
 	tests := []struct {
+		want *models.ServiceStats
 		name string
-		want models.ServiceStats
 	}{
 		{
 			name: "success",
-			want: models.ServiceStats{
+			want: &models.ServiceStats{
 				Users: 1337,
 				URLs:  1338,
 			},
 		},
 		{
 			name: "failure",
-			want: models.ServiceStats{
+			want: &models.ServiceStats{
 				Users: 1337,
 				URLs:  1338,
 			},

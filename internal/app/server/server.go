@@ -33,6 +33,7 @@ import (
 // Pool is a global connection pool variable.
 var Pool *sql.DB
 var shortURLService service.ShortURLService
+var topCtx = context.Background()
 
 // ShortenURLRouter is the function to create the router along with all the business-logic implementations.
 func ShortenURLRouter(shortURLService service.ShortURLServiceInterface) chi.Router {
@@ -87,7 +88,7 @@ func Run(addr string) error {
 				panic(closeErr)
 			}
 		}(Pool)
-		ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
+		ctx, cancel := context.WithTimeout(topCtx, 1*time.Second)
 		defer cancel()
 		if err = Pool.PingContext(ctx); err != nil {
 			return err
@@ -124,7 +125,7 @@ func Run(addr string) error {
 	go func() {
 		<-sigint
 		logger.Log.Info("shutting down HTTP and GRPC servers")
-		if err := server.Shutdown(context.Background()); err != nil {
+		if err := server.Shutdown(topCtx); err != nil {
 			log.Printf("HTTP server Shutdown: %v", err)
 		}
 		gRPCServer.GracefulStop()
@@ -174,7 +175,7 @@ func prefillMemory() error {
 			}
 		}
 		shortURLService = service.NewService(storage.MemoryRepo{}, make(chan struct{}))
-		fillingError := shortURLService.FillRow(context.Background(), row.OriginalURL, row.ShortURL, row.UserID)
+		fillingError := shortURLService.FillRow(topCtx, row.OriginalURL, row.ShortURL, row.UserID)
 		if fillingError != nil {
 			return fillingError
 		}

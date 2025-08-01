@@ -250,35 +250,35 @@ func (D DBRepo) SetURLsInactive(ctx context.Context, shortURLs []string) error {
 }
 
 // GetStats returns the total number of users and shortened URLs stored in the database
-func (D DBRepo) GetStats(ctx context.Context) (models.ServiceStats, error) {
+func (D DBRepo) GetStats(ctx context.Context) (*models.ServiceStats, error) {
 	usersCountPreparedStmt, err := D.pool.PrepareContext(
 		ctx, "SELECT count(*) FROM users")
 	if err != nil {
-		return models.ServiceStats{}, err
+		return &models.ServiceStats{}, err
 	}
 	result := usersCountPreparedStmt.QueryRowContext(ctx)
 	var usersCount int
 	err = result.Scan(&usersCount)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return models.ServiceStats{Users: 0, URLs: 0}, nil
+			return &models.ServiceStats{Users: 0, URLs: 0}, nil
 		}
-		return models.ServiceStats{}, err
+		return &models.ServiceStats{}, err
 	}
 
 	URLsCountPreparedStatement, err := D.pool.PrepareContext(
 		ctx, "SELECT count(*) FROM short_url")
 	if err != nil {
-		return models.ServiceStats{}, err
+		return &models.ServiceStats{}, err
 	}
 	result = URLsCountPreparedStatement.QueryRowContext(ctx)
 	var URLsCount int
 	err = result.Scan(&URLsCount)
 	if err != nil {
-		return models.ServiceStats{}, err
+		return &models.ServiceStats{}, err
 	}
 
-	response := models.ServiceStats{
+	response := &models.ServiceStats{
 		Users: usersCount,
 		URLs:  URLsCount,
 	}

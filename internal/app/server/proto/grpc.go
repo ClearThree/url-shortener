@@ -5,13 +5,14 @@ package proto
 import (
 	"context"
 
+	"github.com/clearthree/url-shortener/internal/app/utils"
+
 	"github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors/auth"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/emptypb"
 
 	"github.com/clearthree/url-shortener/internal/app/config"
-	"github.com/clearthree/url-shortener/internal/app/handlers"
 	"github.com/clearthree/url-shortener/internal/app/models"
 	"github.com/clearthree/url-shortener/internal/app/service"
 )
@@ -38,7 +39,7 @@ func (s ShortenerGRPCServer) CreateShortURL(ctx context.Context, request *Shorte
 	if request.UserId == "" {
 		return nil, status.Error(codes.InvalidArgument, "UserId is required")
 	}
-	if !handlers.IsURL(request.Url) {
+	if !utils.IsURL(request.Url) {
 		return nil, status.Error(codes.InvalidArgument, "URL is invalid")
 	}
 	var response ShortenResponse

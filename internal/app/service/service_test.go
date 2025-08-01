@@ -102,8 +102,8 @@ func (rm RepoMock) SetURLsInactive(_ context.Context, shortURLs []string) error 
 	return nil
 }
 
-func (rm RepoMock) GetStats(_ context.Context) (models.ServiceStats, error) {
-	response := models.ServiceStats{
+func (rm RepoMock) GetStats(_ context.Context) (*models.ServiceStats, error) {
+	response := &models.ServiceStats{
 		Users: len(rm.localIDsStorage),
 		URLs:  len(rm.localStorage),
 	}
@@ -611,8 +611,8 @@ func TestShortURLService_GetStats(t *testing.T) {
 	}
 	tests := []struct {
 		args    args
+		want    *models.ServiceStats
 		name    string
-		want    models.ServiceStats
 		wantErr bool
 	}{
 		{
@@ -620,7 +620,7 @@ func TestShortURLService_GetStats(t *testing.T) {
 			args: args{
 				ctx: context.Background(),
 			},
-			want: models.ServiceStats{
+			want: &models.ServiceStats{
 				Users: 1337,
 				URLs:  1338,
 			},
@@ -632,7 +632,7 @@ func TestShortURLService_GetStats(t *testing.T) {
 			ctrl := gomock.NewController(t)
 			defer ctrl.Finish()
 			repoMock := mocks.NewMockRepository(ctrl)
-			s := &ShortURLService{
+			s := ShortURLService{
 				repo: repoMock,
 			}
 			repoMock.EXPECT().

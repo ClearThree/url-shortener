@@ -67,10 +67,10 @@ func (mr *MockRepositoryMockRecorder) Create(arg0, arg1, arg2, arg3 interface{})
 }
 
 // GetStats mocks base method.
-func (m *MockRepository) GetStats(arg0 context.Context) (models.ServiceStats, error) {
+func (m *MockRepository) GetStats(arg0 context.Context) (*models.ServiceStats, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetStats", arg0)
-	ret0, _ := ret[0].(models.ServiceStats)
+	ret0, _ := ret[0].(*models.ServiceStats)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }

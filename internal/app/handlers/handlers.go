@@ -10,9 +10,10 @@ import (
 	"errors"
 	"io"
 	"net/http"
-	"net/url"
 	"strconv"
 	"strings"
+
+	"github.com/clearthree/url-shortener/internal/app/utils"
 
 	"github.com/clearthree/url-shortener/internal/app/logger"
 	"github.com/clearthree/url-shortener/internal/app/middlewares"
@@ -24,15 +25,6 @@ import (
 
 // maxPayloadSize - is the maximum size of payload that the server can process in the request.
 const maxPayloadSize = 1024 * 1024
-
-// IsURL Is a helper function that checks if the string is a valid URL
-func IsURL(payload string) bool {
-	parsedURL, err := url.Parse(payload)
-	if err != nil {
-		return false
-	}
-	return parsedURL.Scheme == "https" || parsedURL.Scheme == "http"
-}
 
 // IHandler is the interface for all handler-structures
 type IHandler interface {
@@ -93,7 +85,7 @@ func (create CreateShortURLHandler) ServeHTTP(writer http.ResponseWriter, reques
 		return
 	}
 	payloadString := string(payload)
-	if !IsURL(payloadString) {
+	if !utils.IsURL(payloadString) {
 		logger.Log.Warnf("Invalid url: %s", payloadString)
 		http.Error(writer, "The provided payload is not a valid URL", http.StatusBadRequest)
 		return
@@ -197,7 +189,7 @@ func (create CreateJSONShortURLHandler) ServeHTTP(writer http.ResponseWriter, re
 		http.Error(writer, "Please provide an url", http.StatusBadRequest)
 		return
 	}
-	if !IsURL(requestData.URL) {
+	if !utils.IsURL(requestData.URL) {
 		http.Error(writer, "The provided payload is not a valid URL", http.StatusBadRequest)
 		return
 	}
@@ -288,7 +280,7 @@ func (create BatchCreateShortURLHandler) ServeHTTP(writer http.ResponseWriter, r
 		return
 	}
 	for _, requestItem := range requestData {
-		if !IsURL(requestItem.OriginalURL) {
+		if !utils.IsURL(requestItem.OriginalURL) {
 			http.Error(writer, "One of the provided items is not a valid URL", http.StatusBadRequest)
 			return
 		}

@@ -783,25 +783,25 @@ func TestNewGetStatsHandler(t *testing.T) {
 
 func TestGetStatsHandler_ServeHTTP(t *testing.T) {
 	type want struct {
+		payload     *models.ServiceStats
 		contentType string
-		payload     models.ServiceStats
 		code        int
 	}
 	tests := []struct {
+		mockValue *models.ServiceStats
 		name      string
 		want      want
-		mockValue models.ServiceStats
 	}{
 		{
 			name: "Successful get stats",
-			mockValue: models.ServiceStats{
+			mockValue: &models.ServiceStats{
 				Users: 1337,
 				URLs:  1338,
 			},
 			want: want{
 				code:        http.StatusOK,
 				contentType: "application/json",
-				payload: models.ServiceStats{
+				payload: &models.ServiceStats{
 					Users: 1337,
 					URLs:  1338,
 				},

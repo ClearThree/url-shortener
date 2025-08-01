@@ -282,8 +282,8 @@ func TestShortenerGRPCServer_GetServiceStats(t *testing.T) {
 	}
 	tests := []struct {
 		args    args
+		want    *models.ServiceStats
 		name    string
-		want    models.ServiceStats
 		wantErr bool
 	}{
 		{
@@ -291,7 +291,7 @@ func TestShortenerGRPCServer_GetServiceStats(t *testing.T) {
 			args: args{
 				ctx: context.Background(),
 			},
-			want: models.ServiceStats{
+			want: &models.ServiceStats{
 				Users: 13,
 				URLs:  37,
 			},
@@ -302,7 +302,7 @@ func TestShortenerGRPCServer_GetServiceStats(t *testing.T) {
 			args: args{
 				ctx: context.Background(),
 			},
-			want:    models.ServiceStats{},
+			want:    &models.ServiceStats{},
 			wantErr: true,
 		},
 	}
@@ -317,7 +317,7 @@ func TestShortenerGRPCServer_GetServiceStats(t *testing.T) {
 					GetStats(context.Background()).Return(tt.want, nil)
 			} else {
 				shortURLServiceMock.EXPECT().
-					GetStats(context.Background()).Return(models.ServiceStats{}, errors.New("service error"))
+					GetStats(context.Background()).Return(&models.ServiceStats{}, errors.New("service error"))
 			}
 			got, err := s.GetServiceStats(tt.args.ctx, tt.args.in1)
 			if (err != nil) != tt.wantErr {

@@ -79,10 +79,10 @@ func (mr *MockShortURLServiceInterfaceMockRecorder) FlushDeletions() *gomock.Cal
 }
 
 // GetStats mocks base method.
-func (m *MockShortURLServiceInterface) GetStats(arg0 context.Context) (models.ServiceStats, error) {
+func (m *MockShortURLServiceInterface) GetStats(arg0 context.Context) (*models.ServiceStats, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetStats", arg0)
-	ret0, _ := ret[0].(models.ServiceStats)
+	ret0, _ := ret[0].(*models.ServiceStats)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
