@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"os"
+	"strconv"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -363,7 +364,7 @@ func TestGetOrCreateCertAndKey(t *testing.T) {
 	}
 }
 
-func Test_readJSONConfig(t *testing.T) {
+func TestReadJSONConfig(t *testing.T) {
 	type args struct {
 		config   *Config
 		filePath string
@@ -414,6 +415,115 @@ func Test_readJSONConfig(t *testing.T) {
 			}
 			tt.wantErr(t, readJSONConfig(tt.args.config, tt.args.filePath), fmt.Sprintf("readJSONConfig(%v, %v)", tt.args.config, tt.args.filePath))
 			assert.Equal(t, tt.want, tt.args.config)
+		})
+	}
+}
+
+func TestTLSEnabled_Set(t *testing.T) {
+	tests := []struct {
+		name string
+		in   bool
+	}{
+		{
+			name: "set tls enabled true success",
+			in:   true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			e := &TLSEnabled{
+				TLSEnabled: !tt.in,
+			}
+			err := e.Set(strconv.FormatBool(tt.in))
+			assert.NoError(t, err)
+			assert.Equal(t, e.TLSEnabled, tt.in)
+		})
+	}
+}
+
+func TestTLSEnabled_String(t *testing.T) {
+	type fields struct {
+		TLSEnabled bool
+	}
+	tests := []struct {
+		name   string
+		want   string
+		fields fields
+	}{
+		{
+			name: "get tls enabled success",
+			fields: fields{
+				TLSEnabled: true,
+			},
+			want: "true",
+		},
+		{
+			name: "get tls enabled success",
+			fields: fields{
+				TLSEnabled: false,
+			},
+			want: "false",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			e := &TLSEnabled{
+				TLSEnabled: tt.fields.TLSEnabled,
+			}
+			assert.Equalf(t, tt.want, e.String(), "String()")
+		})
+	}
+}
+
+func TestTrustedSubnet_Set(t *testing.T) {
+	tests := []struct {
+		name    string
+		input   string
+		wantErr bool
+	}{
+		{
+			name:    "set trusted subnet success",
+			input:   "192.168.0.0/24",
+			wantErr: false,
+		},
+		{
+			name:    "set trusted subnet empty",
+			input:   "",
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ts := &TrustedSubnet{}
+			err := ts.Set(tt.input)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("Set() error = %v, wantErr %v", err, tt.wantErr)
+			}
+			assert.Equal(t, tt.input, ts.CIDR)
+		})
+	}
+}
+
+func TestTrustedSubnet_String(t1 *testing.T) {
+	tests := []struct {
+		name string
+		want string
+	}{
+		{
+			name: "get trusted subnet success",
+			want: "192.168.0.0/24",
+		},
+		{
+			name: "get trusted subnet empty",
+			want: "",
+		},
+	}
+	for _, tt := range tests {
+		t1.Run(tt.name, func(t1 *testing.T) {
+			t := &TrustedSubnet{
+				CIDR: tt.want,
+			}
+			assert.Equalf(t1, tt.want, t.String(), "String()")
 		})
 	}
 }

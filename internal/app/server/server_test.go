@@ -13,6 +13,8 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/clearthree/url-shortener/internal/app/middlewares"
+	"github.com/clearthree/url-shortener/internal/app/service"
+	"github.com/clearthree/url-shortener/internal/app/storage"
 )
 
 func testRequest(t *testing.T, testServer *httptest.Server, method string, path string, contentType string, payload string) (*http.Response, string) {
@@ -35,8 +37,10 @@ func testRequest(t *testing.T, testServer *httptest.Server, method string, path 
 	return resp, string(respBody)
 }
 
+var serviceForTest = service.NewService(storage.MemoryRepo{}, make(chan struct{}))
+
 func TestRouter(t *testing.T) {
-	testServer := httptest.NewServer(ShortenURLRouter(nil, make(chan struct{})))
+	testServer := httptest.NewServer(ShortenURLRouter(&serviceForTest))
 	defer testServer.Close()
 
 	var tests = []struct {
@@ -136,7 +140,7 @@ func TestRouter(t *testing.T) {
 }
 
 func TestCompression(t *testing.T) {
-	testServer := httptest.NewServer(ShortenURLRouter(nil, make(chan struct{})))
+	testServer := httptest.NewServer(ShortenURLRouter(&serviceForTest))
 	defer testServer.Close()
 	requestBody := `{"url": "https://ya.ru"}`
 
@@ -188,7 +192,7 @@ func TestCompression(t *testing.T) {
 }
 
 func TestAuth(t *testing.T) {
-	testServer := httptest.NewServer(ShortenURLRouter(nil, make(chan struct{})))
+	testServer := httptest.NewServer(ShortenURLRouter(&serviceForTest))
 	defer testServer.Close()
 	requestBody := "https://ya.ru"
 
